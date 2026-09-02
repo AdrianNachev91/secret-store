@@ -70,13 +70,16 @@ A row is added before the deviation is coded. Counts are taken from Sluice's tre
 the time the row is written, never estimated. The columns say what the library does differently,
 why, what Sluice does about it, and how many sites that touches.
 
-| Deviation                                                     | Why the library has it                                          | What Sluice does at adoption                                              | Sites |
-|---------------------------------------------------------------|-----------------------------------------------------------------|---------------------------------------------------------------------------|-------|
-| Port types move from `application/port/out` to `photos.sluice.secrets` | They are the library's API                            | Delete six files, fix imports; `ArchitectureTest` allows a library import | (L2)  |
-| Factory takes an application name and a namespace             | The native keys must not say "Sluice" in a general library      | One line in `AppConfig.secretStore()` passes `"Sluice"`, `"photos.sluice"` | 1     |
-| `SecretId.provider` becomes `SecretId.name`                   | "Provider" is Sluice's vocabulary                               | Rename the accessor at each call site (IDE rename)                        | (L2)  |
-| Messages say "credential 'x'" rather than "for provider 'x'"  | Same                                                            | Nothing, unless a Sluice test pins the text                              | (L2)  |
-| `System.Logger` replaces SLF4J                                | No runtime dependency                                           | Nothing: Spring Boot bridges JUL into its log                             | 0     |
-| `ReservedDeviceNames` copied in, package-private              | The library cannot reach Sluice's domain class                  | Nothing; Sluice keeps its own                                             | 0     |
+| Deviation                                                     | Why the library has it                                          | What Sluice does at adoption                                              | Sites at `1eeca60`                          |
+|---------------------------------------------------------------|-----------------------------------------------------------------|---------------------------------------------------------------------------|---------------------------------------------|
+| Port types move from `application/port/out` to `photos.sluice.secrets` | They are the library's API                            | Delete six files, fix imports; `ArchitectureTest` allows a library import | 9 production files, 9 test files, plus `MissingCredentialException` |
+| Factory takes an application name and a namespace             | The native keys must not say "Sluice" in a general library      | One line in `AppConfig.secretStore()` passes `"Sluice"`, `"photos.sluice"` | 1                                          |
+| `SecretId.provider` becomes `SecretId.name`                   | "Provider" is Sluice's vocabulary                               | Rename the accessor at each call site (IDE rename)                        | 5 sites in 3 files                          |
+| Messages say "credential 'x'" rather than "for provider 'x'"  | Same                                                            | Reword the one test that pins the text                                    | 1 test file                                 |
+| `System.Logger` replaces SLF4J                                | No runtime dependency                                           | Nothing: Spring Boot bridges JUL into its log                             | 0                                           |
+| `ReservedDeviceNames` copied in, package-private              | The library cannot reach Sluice's domain class                  | Nothing; Sluice keeps its own                                             | 0                                           |
 
-Rows marked `(L2)` get their count when L2 writes them.
+Beside the ledger, adoption deletes `adapter/secrets` (17 classes, 11 test classes) and the six
+port types, about 7,400 lines, and adds one POM dependency. Sluice's surefire already passes
+`--enable-native-access=ALL-UNNAMED`. Whether it happens before Sluice goes public is decided
+once this library is finished.
