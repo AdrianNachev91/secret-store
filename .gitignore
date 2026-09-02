@@ -2,3 +2,4 @@ target/
 example/target/
 .idea/
 *.iml
+.mcp.json
