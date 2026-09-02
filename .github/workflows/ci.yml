@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    # A native credential-store call can hang rather than fail, and GitHub's own ceiling is six
+    # hours.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '26'
+          cache: maven
+
+      # A headless runner has neither a session bus nor a Secret Service, so both are started
+      # here. Both daemonize and outlive the step, and the bus address is exported so the test
+      # step's JVM finds the service. The secret-tool round-trip is the daemon's own smoke test,
+      # failing here rather than as a Java test failure further on.
+      - name: Start a Secret Service (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnome-keyring libsecret-1-0 libsecret-tools dbus-x11
+          eval "$(dbus-launch --sh-syntax)"
+          eval "$(printf 'secret-store-ci\n' | gnome-keyring-daemon --unlock --replace --components=secrets)"
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> "$GITHUB_ENV"
+          printf 'smoke' | secret-tool store --label='secret-store CI smoke test' secret-store-ci-smoke check
+          test "$(secret-tool lookup secret-store-ci-smoke check)" = 'smoke'
+          secret-tool clear secret-store-ci-smoke check
+
+      - name: Build and test
+        run: mvn -B test

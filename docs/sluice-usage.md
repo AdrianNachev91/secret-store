@@ -78,6 +78,7 @@ why, what Sluice does about it, and how many sites that touches.
 | Messages say "credential 'x'" rather than "for provider 'x'"  | Same                                                            | Reword the one test that pins the text                                    | 1 test file                                 |
 | `System.Logger` replaces SLF4J                                | No runtime dependency                                           | Nothing: Spring Boot bridges JUL into its log                             | 0                                           |
 | `ReservedDeviceNames` copied in, package-private              | The library cannot reach Sluice's domain class                  | Nothing; Sluice keeps its own                                             | 0                                           |
+| The native bindings sit in a `platform` subpackage            | A flat 24-file package reads as extracted from something else   | Nothing; it never names a binding                                         | 0                                           |
 
 Beside the ledger, adoption deletes `adapter/secrets` (17 classes, 11 test classes) and the six
 port types, about 7,400 lines, and adds one POM dependency. Sluice's surefire already passes

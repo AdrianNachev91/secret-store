@@ -1,0 +1,7 @@
+# Text is stored with LF and checked out with LF, on every platform. Without this, a file's stored
+# line endings are decided by whichever tool last wrote it, and the two do not have to agree. A file
+# stored with CRLF that a script rewrites as LF then reads as every line changed, which turns a
+# small edit into a whole-file diff and buries the real change in a review.
+#
+# Nothing tracked here needs CRLF. Java, Maven, PowerShell and the workflow file all read LF.
+* text=auto eol=lf
