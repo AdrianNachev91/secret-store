@@ -1,0 +1,73 @@
+# secret-store - project context
+
+A tiered secret store for Java. A credential is read from the first place that answers. The
+places, in order, are an environment variable, the operating system's own credential store, and
+a file protected by permissions in the app-data directory. The OS stores are Windows Credential
+Manager, the macOS keychain and the freedesktop Secret Service on Linux. Saves go to the
+strongest writable place, removes clear every place. The OS stores are bound through `java.lang.foreign`, so the library has no runtime
+dependency beyond the JDK. Round-trip tests run against the real stores on all three platforms in
+CI, on every push.
+
+The code was extracted from the Sluice photo organizer's `adapter/secrets` package, copied at
+Sluice commit `1eeca60` into this clean repository. Sluice keeps its own copy and does not consume
+this artifact yet. That is the constraint everything here is built under: **adopting this library
+must cost Sluice no refactor**. So every deviation from Sluice's code is priced in
+`docs/sluice-usage.md` before it is made.
+
+## Read first
+- `docs/design.md` - every locked decision, with the alternatives it beat. Coordinates, Java
+  version, the public surface, naming, the example, releases.
+- `docs/sluice-usage.md` - how Sluice composes and uses the store at the copied sha, and the
+  ledger of every deviation with its adoption cost. Written from Sluice's code, not from memory.
+- When Sluice is checked out beside this repo, its source is at
+  `../Sluice/app/src/main/java/photos/sluice/adapter/secrets/` and the six port types at
+  `../Sluice/app/src/main/java/photos/sluice/application/port/out/Secret*.java` plus
+  `StaleSecretNotClearedException.java`. Read them at `1eeca60`
+  (`git -C ../Sluice show 1eeca60:<path>`), since Sluice's working copy moves on.
+
+## Coordinates and build
+- `photos.sluice:secret-store`, package `photos.sluice.secrets`. Maven, single module.
+- `maven.compiler.release` is the current GA JDK and moves up each March and September.
+- Dependencies: JSpecify (annotations, compile scope) and nothing else at runtime. Logging goes
+  through `System.Logger`. Tests use JUnit 5 and AssertJ only.
+- Build and test: `mvn test`. Surefire passes `--enable-native-access=ALL-UNNAMED`, and a
+  consumer has to do the same; the README says so.
+- CI runs `mvn test` on `ubuntu-latest`, `windows-latest` and `macos-latest` on every push. The
+  Ubuntu runner starts a headless Secret Service first; the recipe is the "Start a Secret Service
+  (Ubuntu)" step of Sluice's `.github/workflows/ci.yml`.
+
+## Conventions carried over from Sluice
+- Every class under `src/main/java` gets a `/** */` block. Test files use `//` only.
+- A comment says only what a reader cannot get from the finished code once. No change narration,
+  no pointer at a neighbour to complete a thought, no explanation of how callers use a method.
+- The tier and the native binding under it stay separate classes. The tier decides what an answer
+  means and is tested on every runner. The binding only carries bytes and runs on its own
+  platform.
+- Fail loud at input boundaries. A store that answers neither yes nor no throws; it never reads
+  as "no credential".
+- Real collaborators in tests: the round-trip tests write to the real credential store of the
+  runner they are on.
+
+## Working method
+- The work is three chunks, L1 to L3, described in `docs/design.md`. One chunk per session.
+- Every chunk: suite green locally first. Then a fresh review agent and a comment sweep over the
+  diff, spawned together on Opus at high effort. Then commit on `main` and wait for the CI
+  conclusion on all three runners before calling it done. No chunk branches; there is nothing a
+  branch would gate.
+- The review brief leads with regression: could this change break behaviour Sluice's copy has
+  today? The reference is Sluice's tests, which travel with the code.
+- **Every commit here is public.** No personal paths, no real credentials in fixtures, no names
+  of people in code, comments or docs. A test secret is a synthetic string.
+- Conventional commit messages, `feat`, `fix`, `docs`, `chore`, `ci`.
+- The README and any other public prose go through the `public-prose-review` skill before they
+  are pushed for the first time.
+
+## Only the repository owner can do these
+Needed for L3, the first publish. Not delegable.
+1. A Central Portal account and the `photos.sluice` namespace request.
+2. The DNS TXT record on `sluice.photos` with the portal's verification key.
+3. A GPG key pair: public half on a keyserver, private half and passphrase as repository secrets
+   beside the portal token.
+4. Repository secrets for the release workflow.
+
+@.claude/memory/MEMORY.md
