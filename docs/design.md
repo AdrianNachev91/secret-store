@@ -49,13 +49,60 @@ version 2 question if anyone asks. The public types are `SecretStore`, `SecretId
 `SecretStatus`, `SecretHolding`, `SecretStoreException`, `StaleSecretNotClearedException` and
 one factory holding what Sluice's `TieredSecretStore.forMachine` does.
 
+**5b. The package tree is closed the same way, and splits in two steps.** Locked 2026-09-02,
+during L1. In Java the package is the visibility boundary, so a split buys a legible tree with
+either API surface or a module descriptor to re-close it. L1 moves the three binding interfaces
+and their implementations to `photos.sluice.secrets.platform`. That publishes six types which
+carry bytes under names the tier hands them, and no extension point, so decision 5 holds
+untouched. The tiers stay put until L2, because moving them publishes `SecretTier`,
+`WritableSecretTier` and `PlatformKeyring`, which is the promise decision 5 declines. L2 takes
+the full `secrets` / `secrets.tier` / `secrets.platform` tree together with a `module-info.java`
+exporting only `photos.sluice.secrets`, alongside the visibility pass that chunk already carries.
+The alternatives were staying flat, which nothing but the file count argues against, and opening
+the tier interfaces outright. Sluice pays nothing either way: it names only the public API types,
+and those never leave `photos.sluice.secrets`.
+
+L1's six is one more than the boundary strictly demands, and L2's visibility pass should weigh
+that. Only the three binding interfaces and some way of obtaining an instance have to cross the
+line. A public factory holding the three `open` calls would keep the three implementations
+package-private and publish four types rather than six.
+
+**5c. A named configuration carrier is L2's to design, and these are the requirements it opens
+with.** Locked 2026-09-02, during L1, so that L2 reopens a decision rather than deriving one.
+L1 ships the naming inputs as two adjacent `String` parameters on `forMachine`, which is what
+decision 5's list of public types allows without an eighth. That shape has two known problems
+and one known extension, and all three want the same answer:
+
+- **The swap is silent.** `forMachine("photos.sluice", "Sluice", ...)` compiles and writes every
+  credential under keys nothing later reads. Two adjacent same-typed parameters is what makes it
+  invisible, and `PlatformKeyring.forThisMachine` repeats the pair one level down.
+- **Nothing pins the wiring, only the derivation.** The three literal-pinning tier tests build a
+  tier directly. So a swap in `PlatformKeyring`, or in `forMachine`'s call to it, leaves the
+  whole suite green on every runner. A test that saves through `forMachine` and reads the entry
+  back through the raw binding under the expected key is what closes it.
+- **A switch per tier, L2's, starting with turning the protected file off.** Locked 2026-09-02.
+  On by default, so Sluice passes nothing and its adoption line is unchanged. That
+  tier is the one place a credential sits unencrypted at rest, and a consumer under a policy
+  against that needs to refuse it. Two things the switch does not do, and the carrier's design
+  has to face both. The environment tier stays mandatory and first by decision 6, so plaintext
+  still answers ahead of everything. And a machine with no keyring and no file tier can read but
+  never save, which `whereASaveWouldStoreIt()` is the way to ask about in advance.
+
+The mechanism behind the third one is one conditional in `forMachine`, and the composition
+already handles a store with no writable tier at all. What is expensive is the parameter shape,
+which is why it waits for the chunk that decides the surface.
+
 **6. Native naming is configuration the consumer passes: two inputs, fixed derivation.** The
 factory takes an application name and a namespace and derives every native key from them. The
-Windows target is `<name>:<entry>`. The macOS service is `<name>` and its label
-`<name>:<entry>`. The libsecret schema is `<namespace>.Credential` with its `name` attribute.
-The file is `<entry>` plus the tier's suffix, in the directory the consumer passes. Sluice's
-inputs are `"Sluice"` and `"photos.sluice"`, and those reproduce the keys Sluice writes today by
-construction. A round-trip test pins the derivation against the literals. A builder exposing
+Windows target is `<name>:<entry>`, with `<entry>` also written as the entry's account name. The
+macOS service is `<name>`, its account is `<entry>` and its label `<name>:<entry>`. The libsecret
+schema is `<namespace>.Credential`, its attribute is `name=<entry>` and its label
+`<name>:<entry>`. The file is `<entry>` plus the tier's suffix, in the directory the consumer
+passes. Sluice's inputs are `"Sluice"` and `"photos.sluice"`, and those reproduce the keys Sluice
+writes today by construction. Four tests pin the derivation against those literals: one per tier
+against a fake store, and one on the schema name. They are not round trips, which is deliberate.
+A round trip would have to write Sluice's real keys into the credential store of whoever ran it.
+What no test pins is the wiring above the derivation, which decision 5c records. A builder exposing
 each native string was rejected as four knobs nothing needs; one can still grow them later
 without breaking two-input callers. Also here: `SecretId(provider, environmentVariable)` becomes
 `SecretId(name, environmentVariable)`, and messages say "credential 'x'" rather than "for
@@ -106,8 +153,8 @@ Sluice's tree when a row is written, never estimated.
 
 | Chunk | What lands                                                                                              |
 |-------|---------------------------------------------------------------------------------------------------------|
-| L1    | The code and its tests copied in under the new package, the two-input naming, `name` for `provider`, `System.Logger`, the POM, and three-OS CI green on every push. |
-| L2    | Visibility pass on the public surface, Javadoc for it, the README, `example/`, and the adoption ledger filled in from Sluice's tree. |
+| L1    | The code and its tests copied in under the new package, the native bindings in `secrets.platform`, the two-input naming, `name` for `provider`, `System.Logger`, the POM, and three-OS CI green on every push. |
+| L2    | Visibility pass on the public surface, the named configuration carrier of decision 5c and its switch for the file tier, the `secrets.tier` split and `module-info.java`, Javadoc for the surface, the README, `example/`, and the adoption ledger filled in from Sluice's tree. |
 | L3    | The `v*` tag workflow with signing and the Central deploy; `0.1.0` published; the example built against it. |
 
 L1 is a large diff and a move: about two hundred lines are real, the rest is relocation. Its
