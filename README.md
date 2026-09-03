@@ -40,12 +40,12 @@ Reaching the operating system's store needs a native-access grant, which a consu
 <dependency>
   <groupId>photos.sluice</groupId>
   <artifactId>secret-store</artifactId>
-  <version>0.1.0</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
-Until `0.1.0` is published, build from source instead: clone this repository, `mvn install`, then
-depend on `0.1.0-SNAPSHOT`.
+Until `1.0.0` is published, build from source instead: clone this repository, `mvn install`, then
+depend on `1.0.0-SNAPSHOT`.
 
 The groupId is the domain the publisher verified with Central, not a statement about the subject.
 The code was cut out of a photo organizer, and nothing photo-specific survived the cut.
@@ -196,8 +196,14 @@ Use this repository's private vulnerability reporting rather than a public issue
 
 ## Status and maintenance
 
-Central is immutable, so a first version nobody has run does not promise stability. `1.0.0`
-follows a real consumer running on it.
+Central is immutable, so a version number is a promise. `1.0.0` says the surface is closed rather
+than settling. The tier interfaces are package-private and `SecretStatus` is sealed, so a fourth
+kind of place cannot arrive without a major version.
+
+The evidence behind that is one consumer, the application this was cut out of. Its whole test suite
+was migrated onto this library and run. A credential its own code had stored was then read back
+through this one, under the same native key. That was on Windows. macOS and Linux key compatibility
+is unproven, and a key that differs by one character reports a stored credential as absent.
 
 Maintained best-effort, revisited each JDK release.
 

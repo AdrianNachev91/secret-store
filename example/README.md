@@ -18,7 +18,7 @@ mvn package
 java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar where
 ```
 
-Until `0.1.0` is on Central that property names the snapshot, so the library has to be built first.
+Until `1.0.0` is on Central that property names the snapshot, so the library has to be built first.
 Insert `mvn install` in the repository root before changing into `example`.
 
 `mvn package` writes `target/secret-store-example.jar` and copies the library beside it into
