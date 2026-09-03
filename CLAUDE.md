@@ -33,16 +33,20 @@ must cost Sluice no refactor**. So every deviation from Sluice's code is priced 
 
 ## Coordinates and build
 - `photos.sluice:secret-store`, package `photos.sluice.secrets`. Maven, single module.
-- `maven.compiler.release` is the current GA JDK and moves up each March and September.
+- `maven.compiler.release` is the current LTS, 25. Raising it breaks every consumer below, so it
+  moves only on a major version.
 - Dependencies: JSpecify (annotations, `provided` scope) and nothing else at runtime. Logging goes
   through `System.Logger`. Tests use JUnit 5 and AssertJ only.
 - Build and test: `mvn test`. Surefire passes `--enable-native-access=ALL-UNNAMED`, and a
   consumer has to do the same; the README says so.
-- CI runs `mvn test` on `ubuntu-latest`, `windows-latest` and `macos-latest`, on a push to `main`
-  or a pull request that touches `src/**`, `pom.xml` or the workflow itself. A docs-only change
-  runs nothing, so a green tick on the previous commit is what stands. The
-  Ubuntu runner starts a headless Secret Service first; the recipe is the "Start a Secret Service
-  (Ubuntu)" step of Sluice's `.github/workflows/ci.yml`.
+- CI runs `mvn test` at the floor JDK on `ubuntu-latest`, `windows-latest` and `macos-latest`.
+  It runs on a push to `main` and on a pull request, in both cases only when the change touches
+  `src/**`, `pom.xml` or the workflow itself. A docs-only change runs nothing, so a green tick on
+  the previous commit is what stands. The Ubuntu runner starts a headless Secret Service first;
+  the recipe is the "Start a Secret Service (Ubuntu)" step of Sluice's `.github/workflows/ci.yml`.
+- `example.yml` is a second workflow, on Ubuntu alone. It installs the library, builds the example
+  against it and runs the jar, which is the only place the example is compiled at all. It needs no
+  Secret Service: with none running, that place drops out and `where` still answers.
 
 ## Conventions carried over from Sluice
 - Every class under `src/main/java` gets a `/** */` block. Test files use `//` only.

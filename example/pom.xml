@@ -14,7 +14,7 @@
     artifact rather than as a module of its build.</description>
 
   <properties>
-    <maven.compiler.release>26</maven.compiler.release>
+    <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Flipped to a released version by the release, so that building this example resolves the
          artifact from Central rather than a local build. Until then it names the snapshot, which

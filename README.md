@@ -20,11 +20,10 @@ distributions ship and a minimal container image does not.
 
 ## Requirements
 
-Java 26 or newer, plus a native-access flag. `maven.compiler.release` is the current GA JDK, and
-the intention is to move it up each March and September rather than hold a floor. A release
-already published keeps working on the JDK it was built for, so it is upgrading that costs you a
-JDK move. There is no LTS build and none is planned. If you are pinned to 17 or 21, this is not
-for you.
+Java 25 or newer, plus a native-access flag. Does not work on 21. The floor is the current
+LTS. It changes only on a new major version: `1.0.0` targets 25, and `2.0.0` would target the next
+LTS, 29. Raising the floor breaks every consumer sitting below it, which is why it never moves
+inside a major version. CI runs the tests at the floor on Windows, macOS and Linux.
 
 Reaching the operating system's store needs a native-access grant, which a consumer passes:
 
@@ -76,7 +75,7 @@ wherever the platform offers one, and it has no switch.
 Where the platform offers no store, or its own store cannot be reached, that place drops out. One
 line is logged at INFO, and a save falls through to the credential file. A Linux session with no
 D-Bus and a container image without libsecret both land here. The install still works, and the
-credential ends up unencrypted on a machine you may have expected a keyring on.
+credential ends up unencrypted rather than in a keyring.
 `whereASaveWouldStoreIt()` answers that before anything is typed, and `status(key)` answers it
 afterwards.
 
@@ -98,7 +97,7 @@ Nothing here defends against code running as you, against root or an administrat
 memory dump. The credential is an ordinary `String` on the heap for as long as you hold it.
 
 It is built for a desktop or command-line application that runs as one person on their own
-machine. For a service, use what your platform already offers.
+machine, not for a service.
 
 ## Limits
 
@@ -127,9 +126,8 @@ the JDK. The APIs underneath have been stable a long time. `advapi32`'s `Cred*` 
 Windows XP as their minimum supported client. GNOME 3.6 shipped libsecret's password API in 2012.
 Security.framework's `SecItem*` were already in the macOS 10.6 SDK.
 
-The cost of that is the requirement above. `java.lang.foreign` is only final from JDK 22, and this
-tracks the current GA release rather than an LTS. It buys less to maintain, not less to keep up
-with.
+The cost of that is the requirement above. `java.lang.foreign` is only final from JDK 22, so 21 is
+out of reach whatever floor this library picks.
 
 The part that is easy to claim and hard to show is that these bindings actually work. Round-trip
 tests write to, read back from and clear the real credential store of the machine they run on. CI

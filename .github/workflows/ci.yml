@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '26'
+          java-version: '25'
           cache: maven
 
       # A headless runner has neither a session bus nor a Secret Service, so both are started
