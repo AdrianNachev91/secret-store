@@ -31,7 +31,9 @@ jobs:
           cache: maven
 
       # The example resolves the library as a released artifact, so the local repository has to
-      # hold the snapshot before it can build. Tests are skipped because ci.yml owns them.
+      # hold the snapshot before it can build. Tests are skipped here because ci.yml owns them.
+      # They would also fail: this runner has no libsecret, and the suite asserts that a Linux
+      # machine offers a Secret Service.
       - name: Install the library
         run: mvn -B install -DskipTests
 
