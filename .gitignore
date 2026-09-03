@@ -3,3 +3,8 @@ example/target/
 .idea/
 *.iml
 .mcp.json
+
+# Working notes that die at the first release. The folder is tracked so it exists on a clone,
+# and nothing inside it is.
+tmp/*
+!tmp/.gitkeep

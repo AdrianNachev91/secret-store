@@ -37,8 +37,7 @@ final class ReservedDeviceNames {
     /**
      * Prevents instantiation of this static utility class.
      */
-    private ReservedDeviceNames() {
-    }
+    private ReservedDeviceNames() {}
 
     /**
      * Whether a path segment names a device Windows reserves.

@@ -1,10 +1,8 @@
 package photos.sluice.secrets;
 
-import photos.sluice.secrets.platform.Advapi32CredentialManager;
-import photos.sluice.secrets.platform.LibsecretService;
 import photos.sluice.secrets.platform.LinuxSecretService;
 import photos.sluice.secrets.platform.MacKeychain;
-import photos.sluice.secrets.platform.SecurityFrameworkKeychain;
+import photos.sluice.secrets.platform.PlatformBindings;
 import photos.sluice.secrets.platform.WindowsCredentialManager;
 
 import java.lang.System.Logger;
@@ -18,11 +16,12 @@ import java.util.function.Supplier;
  *
  * <p>The one place a platform's credential store is registered. A machine whose platform has no
  * binding here, or has one that will not load, gets no keyring tier at all. The store above then
- * falls through to the protected file. That is a working install rather than a degraded one.
+ * falls through to whatever writable tier its consumer named. That is a working install rather
+ * than a degraded one.
  *
  * <p>All three desktop platforms have a binding. What still answers with nothing is a platform none
  * is written for, a BSD or a Solaris, and a machine whose own platform's library will not load.
- * Both keep their credential in the protected file.
+ * Both fall to the protected file, where the consumer asked for one.
  */
 final class PlatformKeyring {
 
@@ -31,8 +30,7 @@ final class PlatformKeyring {
     /**
      * Prevents instantiation of this static utility class.
      */
-    private PlatformKeyring() {
-    }
+    private PlatformKeyring() {}
 
     /**
      * Resolves the credential store tier for the given operating system.
@@ -115,13 +113,14 @@ final class PlatformKeyring {
      *         no Windows Credential Manager to bind
      */
     private static Optional<WindowsCredentialManager> windowsCredentialManager() {
-        return bindOrExplain(Advapi32CredentialManager::open);
+        return bindOrExplain(PlatformBindings::openWindowsCredentialManager);
     }
 
     /**
      * Binds the Secret Service through libsecret, or answers with nothing where this machine has
      * none. A Linux install without a desktop keyring is ordinary, a server most of all. Such a
-     * machine keeps its credential in the protected file rather than being a broken one.
+     * machine is working rather than broken, and keeps its credential in the protected file where
+     * the consumer asked for one.
      *
      * @param namespace {@link String} the consumer's reverse-domain namespace, which the schema
      *         every call carries is built from
@@ -129,7 +128,7 @@ final class PlatformKeyring {
      *         Secret Service to bind
      */
     private static Optional<LinuxSecretService> linuxSecretService(final String namespace) {
-        return bindOrExplain(() -> LibsecretService.open(namespace));
+        return bindOrExplain(() -> PlatformBindings.openLinuxSecretService(namespace));
     }
 
     /**
@@ -142,7 +141,7 @@ final class PlatformKeyring {
      *         to bind
      */
     private static Optional<MacKeychain> macKeychain(final String applicationName) {
-        return bindOrExplain(() -> SecurityFrameworkKeychain.open(applicationName));
+        return bindOrExplain(() -> PlatformBindings.openMacKeychain(applicationName));
     }
 
     /**

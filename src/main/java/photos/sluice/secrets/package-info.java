@@ -1,14 +1,16 @@
-// Credential storage across the tiers a machine offers, behind the SecretStore interface.
-// TieredSecretStore orders the tiers and decides which of them each operation reaches; a read
-// tries all, a save reaches one, a remove reaches every writable one. One class per tier,
-// deliberately: a tier that only runs on its own platform is then its own unit. That keeps the
-// code choosing between tiers separable from the code talking to any one of them.
-//
-// A platform's credential store splits further, into the tier and the native binding under it.
-// PlatformKeyring picks the tier, the tier decides what an answer means, and the binding only
-// carries bytes to and from the operating system. The bindings live in the platform subpackage.
-// The split is what makes the deciding half testable on every runner. A binding's own operations
-// only run on the platform whose library it binds, so no single run can cover one.
+/**
+ * A tiered secret store. A credential is read from the first place that answers, saved to the
+ * strongest place that can be written, and cleared from every place on a remove.
+ *
+ * <p>{@link SecretStore#forApplication} builds one. The places are an environment variable, the
+ * operating system's own credential store, and a permission-restricted file in a directory the
+ * consumer names. The two that hold a credential in the clear are named on the builder or left
+ * out. The operating system's own store is used wherever the platform offers one.
+ *
+ * <p>Reaching that store needs native access. A consumer on the classpath passes
+ * {@code --enable-native-access=ALL-UNNAMED}, and one on the module path passes
+ * {@code --enable-native-access=photos.sluice.secrets}.
+ */
 @NullMarked
 package photos.sluice.secrets;
 

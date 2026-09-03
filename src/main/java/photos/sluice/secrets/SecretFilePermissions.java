@@ -36,8 +36,7 @@ final class SecretFilePermissions {
     /**
      * Prevents instantiation of this static utility class.
      */
-    private SecretFilePermissions() {
-    }
+    private SecretFilePermissions() {}
 
     /**
      * Restricts the given file to its owner, and reports whether the filesystem allowed it.

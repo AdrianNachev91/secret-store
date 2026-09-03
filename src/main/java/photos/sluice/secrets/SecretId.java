@@ -10,7 +10,9 @@ import java.util.regex.Pattern;
  * else.
  *
  * <p>The environment variable name travels with the id because a status line quotes it back to the
- * user, and it differs per credential.
+ * user, and it differs per credential. It is required whether or not a given store consults the
+ * environment, so that an id describes a credential rather than one store's configuration. A
+ * store built without the environment place reads it nowhere.
  *
  * @param name {@link String} what this credential is called
  * @param environmentVariable {@link String} name of the environment variable that overrides it
@@ -21,8 +23,9 @@ public record SecretId(String name, String environmentVariable) {
 
     /**
      * Refuses an id missing either half, or naming a credential that cannot safely become a
-     * filename. Both halves locate a stored value, so neither can be absent without the lookup
-     * silently reading somewhere else.
+     * filename. The name locates the value in every place a store can read. The variable name
+     * locates it in the environment. Neither can be absent without a lookup silently reading
+     * somewhere else.
      *
      * <p>The name becomes a path segment under the credential directory and part of an entry name
      * in the operating system's own store, and the caller chooses it. Anything outside lower-case
