@@ -52,7 +52,8 @@ public interface MacKeychain {
      * @param label {@link String} what a user browsing their own keychain sees the entry called;
      *         display only, never a way to find an entry
      * @param secret byte array the bytes to store
-     * @throws SecretStoreException when the keychain refused the write
+     * @throws SecretStoreException when the keychain refused the write, or something else kept
+     *         changing the entry while it ran
      */
     void write(String name, String label, byte[] secret);
 

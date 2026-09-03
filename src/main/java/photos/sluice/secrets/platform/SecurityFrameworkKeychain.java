@@ -71,6 +71,11 @@ final class SecurityFrameworkKeychain implements MacKeychain {
     private static final int NO_DEFAULT_KEYCHAIN = -25307;
     private static final int INTERACTION_NOT_ALLOWED = -25308;
 
+    /**
+     * The most passes a store takes.
+     */
+    private static final int STORE_ATTEMPTS = 2;
+
     private static final String SECURITY_FRAMEWORK =
             "/System/Library/Frameworks/Security.framework/Security";
 
@@ -104,6 +109,8 @@ final class SecurityFrameworkKeychain implements MacKeychain {
 
     private final @Nullable String itemClassOverride;
 
+    private final CompetingWriter competitor;
+
     /**
      * The service attribute every entry carries, and every lookup matches on. It groups the
      * consumer's credentials under one heading in Keychain Access, so the account only has to be
@@ -120,14 +127,17 @@ final class SecurityFrameworkKeychain implements MacKeychain {
      * @param service {@link String} the service attribute every entry carries
      * @param itemClassOverride {@link String} an item class to send in place of the generic-password
      *         one, or null to send that one. Only a test supplies it.
+     * @param competitor {@link CompetingWriter} what acts on the entry inside a store. Only a test
+     *         supplies one that does anything.
      * @param security {@link Framework} the loaded Security.framework
      * @param coreFoundation {@link Framework} the loaded CoreFoundation framework
      */
     private SecurityFrameworkKeychain(final String service,
-            final @Nullable String itemClassOverride,
+            final @Nullable String itemClassOverride, final CompetingWriter competitor,
             final Framework security, final Framework coreFoundation) {
         this.service = service;
         this.itemClassOverride = itemClassOverride;
+        this.competitor = competitor;
         final Linker linker = Linker.nativeLinker();
         this.itemCopyMatching = linker.downcallHandle(security.symbol("SecItemCopyMatching"),
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
@@ -215,7 +225,28 @@ final class SecurityFrameworkKeychain implements MacKeychain {
      * @throws UnsatisfiedLinkError when a framework is present but cannot be loaded
      */
     static MacKeychain open(final String service, final @Nullable String itemClass) {
-        return new SecurityFrameworkKeychain(service, itemClass,
+        return open(service, itemClass, CompetingWriter.NONE);
+    }
+
+    /**
+     * Binds the keychain, letting the given writer act on the entry inside a store.
+     *
+     * <p>Package-private so a test can change the entry while a store is part-way through. A store
+     * is more than one native call, and nothing outside this process can be scheduled between two
+     * of them on demand.
+     *
+     * @param service {@link String} the service attribute every entry carries
+     * @param itemClass {@link String} the item class to send, or null to send the generic-password
+     *         one
+     * @param competitor {@link CompetingWriter} what acts on the entry inside a store
+     * @return {@link MacKeychain} the bound keychain
+     * @throws IllegalArgumentException when this machine is missing either framework, or one of them
+     *         exports none of the names read here
+     * @throws UnsatisfiedLinkError when a framework is present but cannot be loaded
+     */
+    static MacKeychain open(final String service, final @Nullable String itemClass,
+            final CompetingWriter competitor) {
+        return new SecurityFrameworkKeychain(service, itemClass, competitor,
                 new Framework("Security.framework",
                         SymbolLookup.libraryLookup(SECURITY_FRAMEWORK, Arena.global())),
                 new Framework("CoreFoundation.framework",
@@ -289,14 +320,29 @@ final class SecurityFrameworkKeychain implements MacKeychain {
                     new MemorySegment[] {this.itemClass(arena, scope),
                             this.string(arena, scope, this.service), this.string(arena, scope, name),
                             this.string(arena, scope, label), this.data(arena, scope, secret)});
-            final int added = this.callAdd(attributes);
             // There is no upsert here. An add over an entry the service and account already name is
-            // refused, and updating it is a second call with its own dictionary.
-            if (added == DUPLICATE_ITEM) {
-                this.update(arena, scope, name, label, secret);
-                return;
+            // refused, and updating it is a second call with its own dictionary. Anything else
+            // holding the keychain can remove that entry between the two, and the update then
+            // answers that there is nothing to update. A store the machine would have accepted a
+            // moment earlier starts over rather than reporting a refusal.
+            for (int attempt = 0; attempt < STORE_ATTEMPTS; attempt++) {
+                this.competitor.beforeEachAdd();
+                final int added = this.callAdd(attributes);
+                if (added != DUPLICATE_ITEM) {
+                    this.throwIfRefused(added, "store", name);
+                    return;
+                }
+                this.competitor.beforeEachUpdate();
+                final int updated = this.update(arena, scope, name, label, secret);
+                if (updated != ITEM_NOT_FOUND) {
+                    this.throwIfRefused(updated, "store", name);
+                    return;
+                }
             }
-            this.throwIfRefused(added, "store", name);
+            throw new SecretStoreException(SecretStoreException.Tier.KEYRING,
+                    "The keychain could not store the entry '" + name + "': something else kept"
+                            + " adding and removing it while this credential was being stored"
+                            + " (error " + ITEM_NOT_FOUND + ")");
         }
     }
 
@@ -385,13 +431,16 @@ final class SecurityFrameworkKeychain implements MacKeychain {
     /**
      * Overwrites the value and the label of an entry the keychain already held.
      *
+     * <p>{@link #ITEM_NOT_FOUND} here is an entry removed since the add, not a refusal.
+     *
      * @param arena {@link Arena} the allocation scope of the call being made
      * @param scope {@link CfScope} what releases anything created here
      * @param name {@link String} the entry to overwrite
      * @param label {@link String} what a user browsing their own keychain sees the entry called
      * @param secret byte array the bytes to store
+     * @return int the status the keychain answered with
      */
-    private void update(final Arena arena, final CfScope scope, final String name,
+    private int update(final Arena arena, final CfScope scope, final String name,
             final String label, final byte[] secret) {
         final MemorySegment query = this.dictionary(arena, scope,
                 new MemorySegment[] {this.attributeClass, this.attributeService,
@@ -404,7 +453,7 @@ final class SecurityFrameworkKeychain implements MacKeychain {
                 new MemorySegment[] {this.attributeLabel, this.valueData},
                 new MemorySegment[] {this.string(arena, scope, label),
                         this.data(arena, scope, secret)});
-        this.throwIfRefused(this.callUpdate(query, changes), "store", name);
+        return this.callUpdate(query, changes);
     }
 
     /**
@@ -684,6 +733,31 @@ final class SecurityFrameworkKeychain implements MacKeychain {
         } catch (final Throwable unreachable) {
             throw binding(unreachable);
         }
+    }
+
+    /**
+     * Something else writing to the same entry while a store runs.
+     *
+     * <p>What a test stands in for. A real one is another process, and cannot be scheduled into a
+     * store on demand.
+     */
+    interface CompetingWriter {
+
+        /**
+         * What production passes.
+         */
+        CompetingWriter NONE = new CompetingWriter() {};
+
+        /**
+         * Acts before each add, the first one included, so before the store has touched the keychain
+         * at all.
+         */
+        default void beforeEachAdd() {}
+
+        /**
+         * Acts before each update, so after an add has reported a clash.
+         */
+        default void beforeEachUpdate() {}
     }
 
     /**

@@ -10,6 +10,7 @@ import photos.sluice.secrets.SecretStoreException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -122,9 +123,9 @@ class SecurityFrameworkKeychainTest {
 
         @Test
         void storesACredentialAndReadsTheSameValueBack() {
-            this.write(NAME, "sk-synthetic-0001");
+            this.writeTheEntry("sk-synthetic-0001");
 
-            assertThat(this.read(NAME)).isEqualTo("sk-synthetic-0001");
+            assertThat(this.readTheEntry()).isEqualTo("sk-synthetic-0001");
         }
 
         // The value crosses the seam as bytes and lives here as text, so the encode and the decode
@@ -132,19 +133,71 @@ class SecurityFrameworkKeychainTest {
         // stays inside it would survive a mismatch in the low byte of every character.
         @Test
         void storesACredentialCarryingCharactersOutsideAscii() {
-            this.write(NAME, "sk-synthetic-éüß-0001");
+            this.writeTheEntry("sk-synthetic-éüß-0001");
 
-            assertThat(this.read(NAME)).isEqualTo("sk-synthetic-éüß-0001");
+            assertThat(this.readTheEntry()).isEqualTo("sk-synthetic-éüß-0001");
         }
 
         // Nothing else reaches the second of the two calls a replace takes, and a wrong version of
         // it stores the first value forever while reporting success.
         @Test
         void replacesAnEntryTheKeychainAlreadyHeld() {
-            this.write(NAME, "sk-synthetic-0001");
-            this.write(NAME, "sk-synthetic-0002");
+            this.writeTheEntry("sk-synthetic-0001");
+            this.writeTheEntry("sk-synthetic-0002");
 
-            assertThat(this.read(NAME)).isEqualTo("sk-synthetic-0002");
+            assertThat(this.readTheEntry()).isEqualTo("sk-synthetic-0002");
+        }
+
+        // The removal count is asserted too, so a store that answered correctly without ever
+        // entering the window cannot pass.
+        @Test
+        void storesTheCredentialWhenSomethingElseRemovesTheEntryMidReplace() {
+            final MacKeychain uncontested = this.keychain;
+            this.writeTheEntry("sk-synthetic-0001");
+            final AtomicInteger removals = new AtomicInteger();
+            final MacKeychain removedMidReplace = SecurityFrameworkKeychain.open(
+                    "SecretStoreFixture", null, new SecurityFrameworkKeychain.CompetingWriter() {
+                        @Override
+                        public void beforeEachUpdate() {
+                            removals.incrementAndGet();
+                            uncontested.delete(NAME);
+                        }
+                    });
+
+            removedMidReplace.write(NAME, LABEL,
+                    "sk-synthetic-0002".getBytes(StandardCharsets.UTF_8));
+
+            assertThat(removals).hasValue(1);
+            assertThat(this.readTheEntry()).isEqualTo("sk-synthetic-0002");
+        }
+
+        // The competitor here wins every window, which no ordinary machine does.
+        //
+        // The status number is asserted because a user reading this message has nothing else to
+        // look up, and it is the one hand-transcribed integer in it.
+        @Test
+        void refusesTheStoreWhenTheEntryKeepsBeingPutBack() {
+            final MacKeychain uncontested = this.keychain;
+            final MacKeychain alwaysContested = SecurityFrameworkKeychain.open("SecretStoreFixture",
+                    null, new SecurityFrameworkKeychain.CompetingWriter() {
+                        @Override
+                        public void beforeEachAdd() {
+                            uncontested.write(NAME, LABEL,
+                                    "sk-synthetic-0003".getBytes(StandardCharsets.UTF_8));
+                        }
+
+                        @Override
+                        public void beforeEachUpdate() {
+                            uncontested.delete(NAME);
+                        }
+                    });
+
+            assertThatThrownBy(() -> alwaysContested.write(NAME, LABEL,
+                    "sk-synthetic-0002".getBytes(StandardCharsets.UTF_8)))
+                    .isInstanceOf(SecretStoreException.class)
+                    .hasMessageContaining(NAME)
+                    .hasMessageContaining("adding and removing")
+                    .hasMessageContaining("-25300");
         }
 
         // A missing entry must arrive as an answer rather than a fault. Getting it wrong turns every
@@ -159,14 +212,14 @@ class SecurityFrameworkKeychainTest {
         void reportsWhetherAnEntryExistsWithoutFailing() {
             assertThat(this.keychain.holds(NEVER_STORED)).isFalse();
 
-            this.write(NAME, "sk-synthetic-0001");
+            this.writeTheEntry("sk-synthetic-0001");
 
             assertThat(this.keychain.holds(NAME)).isTrue();
         }
 
         @Test
         void removesAStoredEntry() {
-            this.write(NAME, "sk-synthetic-0001");
+            this.writeTheEntry("sk-synthetic-0001");
 
             this.keychain.delete(NAME);
 
@@ -196,12 +249,12 @@ class SecurityFrameworkKeychainTest {
                             .isEqualTo(SecretStoreException.Tier.KEYRING));
         }
 
-        private void write(final String name, final String secret) {
-            this.keychain.write(name, LABEL, secret.getBytes(StandardCharsets.UTF_8));
+        private void writeTheEntry(final String secret) {
+            this.keychain.write(NAME, LABEL, secret.getBytes(StandardCharsets.UTF_8));
         }
 
-        private String read(final String name) {
-            return new String(this.keychain.read(name).orElseThrow(), StandardCharsets.UTF_8);
+        private String readTheEntry() {
+            return new String(this.keychain.read(NAME).orElseThrow(), StandardCharsets.UTF_8);
         }
     }
 }
