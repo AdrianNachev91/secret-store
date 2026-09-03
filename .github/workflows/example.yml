@@ -1,0 +1,46 @@
+name: Example
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'example/**'
+      - 'src/**'
+      - 'pom.xml'
+      - '.github/workflows/example.yml'
+  pull_request:
+    paths:
+      - 'example/**'
+      - 'src/**'
+      - 'pom.xml'
+      - '.github/workflows/example.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # A native credential-store call can hang rather than fail, and GitHub's own ceiling is six
+    # hours.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # The example resolves the library as a released artifact, so the local repository has to
+      # hold the snapshot before it can build. Tests are skipped because ci.yml owns them.
+      - name: Install the library
+        run: mvn -B install -DskipTests
+
+      - name: Build the example
+        run: mvn -B -f example/pom.xml package
+
+      # Its main method is package-private, which compiles on any release and is the launcher's
+      # call at run time. Packaging alone would prove nothing, so the jar runs. `where` writes to
+      # no place. Nothing starts a Secret Service here, and `where` answers whether or not one is
+      # reachable.
+      - name: Run the example
+        run: java --enable-native-access=ALL-UNNAMED -jar example/target/secret-store-example.jar where
