@@ -6,7 +6,7 @@
 
   <groupId>photos.sluice</groupId>
   <artifactId>secret-store-example</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>1.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>secret-store-example</name>
@@ -20,7 +20,7 @@
          artifact from Central rather than a local build. Until then it names the snapshot, which
          `mvn install` in the parent directory puts in the local repository. A release that leaves
          this on a snapshot proves nothing, so the release checklist owns the flip. -->
-    <secret-store.version>0.1.0-SNAPSHOT</secret-store.version>
+    <secret-store.version>1.0.0-SNAPSHOT</secret-store.version>
   </properties>
 
   <dependencies>

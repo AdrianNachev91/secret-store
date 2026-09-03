@@ -158,12 +158,15 @@ machine is the one that never had a keyring, and this is the trade that keeps it
 
 A release will be published from CI on a `v*` tag, signed with a GPG key from the repository
 secrets, through the Central publishing plugin. That workflow and the POM configuration Central
-requires are not written yet, so nothing publishes today. Central is immutable, so a first version
-nobody has run does not promise stability. `1.0.0` follows a real consumer running on it.
+requires are not written yet, so nothing publishes today. Central is immutable, so a version number
+is a promise. `1.0.0` says the surface is closed rather than settling, which the sealed
+`SecretStatus` and the package-private tier interfaces already enforce. Its evidence is one
+consumer's suite migrated onto the library and run, and one credential read back across the two
+under the same native key, on Windows alone.
 
 `example/` is a separate Maven project rather than a module of this build. Its POM names the
 library version in one property, which the release sets to the version it just published. Building
-the example then proves the artifact rather than the tree it came from. Until `0.1.0` is published
+the example then proves the artifact rather than the tree it came from. Until `1.0.0` is published
 that property names the snapshot.
 
 ## Licence
@@ -177,3 +180,7 @@ generalises, being one interface and an ordering each place declares. `SecretSta
 is sealed to four variants, so a new kind of place has no variant to report through. A consumer's
 exhaustive switch would have to grow a case. A config-driven place reporting through one generic
 variant is the candidate answer, deferred until someone needs it.
+
+Shipping `1.0.0` prices that deferral. A fifth variant is a breaking change from here, so answering
+this question costs a major version rather than a minor one. That is the trade the sealed type was
+chosen for, taken deliberately.
