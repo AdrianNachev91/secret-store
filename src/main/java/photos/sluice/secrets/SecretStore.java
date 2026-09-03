@@ -12,11 +12,11 @@ import java.util.Optional;
  * lives needs the tier and must never hold the value. So {@link #status} cannot return a
  * credential at all.
  *
- * <p>A read consults every tier and the first to answer wins, with an environment variable ahead of
- * anything stored.
+ * <p>A read stops at the first tier that answers, with an environment variable ahead of anything
+ * stored.
  *
- * <p>A save never reaches an environment variable, and a remove clears every tier that can hold a
- * value. Clearing only the tier that answered would expose an older value underneath it.
+ * <p>A save never reaches an environment variable, and a remove clears every tier a save can write
+ * to. Clearing only the tier that answered would expose an older value underneath it.
  */
 public interface SecretStore {
 
@@ -62,7 +62,8 @@ public interface SecretStore {
      * <p>The two tiers that hold a credential in the clear are opt-in. An environment variable is
      * plaintext by nature, and a credential file is unencrypted at rest. A consumer under a policy
      * against either has to be able to leave it out, so neither is on until a call here names it.
-     * The machine's own credential store is not switchable.
+     * The machine's own credential store has no such switch. A platform no binding is written for,
+     * or one whose library will not load, leaves the store with no keyring tier at all.
      *
      * <p>So a store naming neither plaintext tier, on a machine with no credential store, reads
      * nothing and refuses every save. {@link SecretStore#whereASaveWouldStoreIt} answers that in
@@ -218,7 +219,7 @@ public interface SecretStore {
     void save(SecretId id, String secret);
 
     /**
-     * Clears the given credential from every tier that can hold one. An environment variable is
+     * Clears the given credential from every tier a save can write to. An environment variable is
      * left alone, so a credential named by one still answers afterwards.
      *
      * @param id {@link SecretId} which credential to clear

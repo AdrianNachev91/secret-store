@@ -7,25 +7,19 @@ printing the credential.
 ## Build and run it
 
 This is its own Maven project rather than a module of the library's build. The library version it
-resolves is the `secret-store.version` property in its POM. The release sets that to the version
-it just published, so that building this proves the artifact as published rather than the tree it
-came from.
-
-Until `0.1.0` is on Central, that property names the snapshot, so build the library first:
+resolves is the `secret-store.version` property in the example's own POM. The release sets that to
+the version it just published, so that building this proves the artifact as published rather than
+the tree it came from.
 
 ```
 git clone https://github.com/AdrianNachev91/secret-store.git
-cd secret-store
-mvn install
-cd example
+cd secret-store/example
 mvn package
-```
-
-Once `0.1.0` is published, only the last two lines are needed. Then:
-
-```
 java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar where
 ```
+
+Until `0.1.0` is on Central that property names the snapshot, so the library has to be built first.
+Insert `mvn install` in the repository root before changing into `example`.
 
 `mvn package` writes `target/secret-store-example.jar` and copies the library beside it into
 `target/lib`, which the jar's manifest points at. `java -jar` ignores any classpath given on the
@@ -46,27 +40,40 @@ $ java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar w
   the protected file: EMPTY
 A save would go to this machine's credential store
 
-$ java ... -jar target/secret-store-example.jar store sk-ant-api03-synthetic-demo
+$ java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar store sk-ant-api03-synthetic-demo
 Stored. In force: this machine's credential store
 
-$ java ... -jar target/secret-store-example.jar read
+$ java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar read
 Found 27 characters, from this machine's credential store
 
-$ java ... -jar target/secret-store-example.jar where
+$ java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar where
   the environment variable ANTHROPIC_API_KEY: EMPTY
   this machine's credential store: HOLDS
   the protected file: EMPTY
 A save would go to this machine's credential store
 
-$ java ... -jar target/secret-store-example.jar forget
+$ java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar forget
 Cleared. In force: nowhere
 
-$ java ... -jar target/secret-store-example.jar read
+$ java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar read
 No credential stored.
 ```
 
-Only the keyring line changes after a store, because that is where the save landed on this
-machine. A machine with no credential store would show the file line holding it instead.
+Only the keyring line changes after a store, because that is where the save landed on this machine.
+
+A machine with no keyring shows something different. This is the same first command on the Ubuntu
+runner of the Example workflow, which installs no `libsecret`:
+
+```
+$ java --enable-native-access=ALL-UNNAMED -jar example/target/secret-store-example.jar where
+INFO: Could not bind a credential store on this machine, so credentials go to the protected file instead. Reason: Cannot open library: libsecret-1.so.0
+  the environment variable ANTHROPIC_API_KEY: EMPTY
+  the protected file: EMPTY
+A save would go to the protected file
+```
+
+The credential store has no line at all, rather than a line saying EMPTY. A place whose library
+will not load is not listed.
 
 `read` prints the credential's length rather than the credential. Nothing here ever prints one.
 

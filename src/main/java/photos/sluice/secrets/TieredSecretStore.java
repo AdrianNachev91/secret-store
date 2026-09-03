@@ -10,8 +10,9 @@ import java.util.Optional;
  * to.
  *
  * <p>The three operations reach different tiers, and that asymmetry is the whole of this class. A
- * read tries all of them. A save writes to the writable one that ranks highest and says it can be
- * used here, then clears any tier that outranks it. A remove reaches every writable tier.
+ * read stops at the first that answers. A save writes to the writable one that ranks highest and
+ * says it can be used here, then clears any tier that outranks it. A remove reaches every writable
+ * tier.
  *
  * <p>A remove clearing only the tier that answered would expose an older credential sitting in a
  * tier below it, which reads as the removal having silently failed. A save leaving a stale value
@@ -205,8 +206,8 @@ class TieredSecretStore implements SecretStore {
     private static SecretStoreException clearingFailed(final SecretId id,
             final List<RuntimeException> failures) {
         final var failure = new SecretStoreException(SecretStoreException.Tier.STORE,
-                "The credential '" + id.name() + "' was not cleared from every tier that can hold"
-                        + " one, so it may still answer a read");
+                "The credential '" + id.name() + "' was not cleared from every tier that can be"
+                        + " written to, so it may still answer a read");
         failures.forEach(failure::addSuppressed);
         return failure;
     }
