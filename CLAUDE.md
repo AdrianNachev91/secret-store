@@ -1,8 +1,8 @@
 # secret-store
 
 A tiered secret store for Java. A credential is read from the first place that answers, saved to the
-strongest place that can be written, and cleared from every place on a remove. The places, in read
-order, are an environment variable, the operating system's own credential store, and a
+strongest place that can be written, and cleared from every place a save can reach. The places, in
+read order, are an environment variable, the operating system's own credential store, and a
 permission-restricted file in a directory the consumer names. The OS stores are Windows Credential
 Manager, the macOS keychain and the freedesktop Secret Service. They are bound through
 `java.lang.foreign`, so the library has no runtime dependency beyond the JDK.
@@ -13,6 +13,9 @@ Manager, the macOS keychain and the freedesktop Secret Service. They are bound t
 - `docs/design.md` - the model, configuration, native keys, the public surface, packaging, the Java
   floor, concurrency, refusals and releases. It says what the library is, never how it got there, so
   keep it that way when you edit it.
+- `example/README.md` - what the example does and how to build and run it. It carries a full
+  transcript from a Windows machine, and the Example workflow's `where` from a runner with no
+  keyring.
 - `tmp/` is the scratch folder for local working notes. The folder is tracked so it exists on a
   clone, and everything inside it is gitignored, so it arrives empty.
 
@@ -31,8 +34,10 @@ Manager, the macOS keychain and the freedesktop Secret Service. They are bound t
   Service first.
 - `example.yml` is a second workflow, on Ubuntu alone. It installs the library, builds the example
   against it and runs the jar. That is the only place the example is compiled at all, and it fires
-  on a change under `example/` as well. It needs no Secret Service: with none running, that place
-  drops out and `where` still answers.
+  on a change under `example/` as well. It installs no `libsecret`, so the binding cannot load, the
+  keyring place is absent from the listing entirely, and `where` still answers off the file place.
+  That is a different state from a machine whose `libsecret` loads over a session with no D-Bus,
+  where the place stays listed and answers nothing.
 
 ## Conventions
 - Every class under `src/main/java` gets a `/** */` block. Test files use `//` only.
@@ -40,12 +45,19 @@ Manager, the macOS keychain and the freedesktop Secret Service. They are bound t
   pointer at a neighbour to complete a thought, no explanation of how callers use a method.
 - The tier and the native binding under it stay separate classes. The tier decides what an answer
   means and is tested on every runner. The binding only carries bytes and runs on its own platform.
-- Fail loud at input boundaries. A store that answers neither yes nor no throws; it never reads as
-  "no credential".
+- The native key derivation in `docs/design.md` is frozen. Changing the application name, the
+  namespace or the shape of a key orphans every credential a consumer already stored, silently.
+  The tier tests pin it against literals. Do not edit them to match a change.
+- Fail loud at input boundaries. A place that answers other questions and refuses this one throws;
+  it never reads as "no credential". A place that answers nothing at all is treated as unavailable
+  instead, which `docs/design.md` states and the tier classes reason about in full.
 - Real collaborators in tests: the round-trip tests write to the real credential store of the runner
   they are on.
 - A test secret is a synthetic string. No real credential, no personal path and no person's name in
-  code, comments or docs, beyond the repository's own URL.
+  code, comments or docs, beyond the repository's own URL and the copyright line in `LICENSE`.
+- The transcripts in `example/README.md` are real runs, pasted. Changing what the CLI prints means
+  running the Windows sequence again, and taking the runner's `where` from the latest Example
+  workflow log.
 - Conventional commit messages: `feat`, `fix`, `docs`, `chore`, `ci`.
 - The README's usage snippet stays in a ```java fence. IntelliJ injects Java into it and reports a
   dozen parse errors, because a fragment is not a compilation unit. The errors are expected and

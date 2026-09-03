@@ -1,6 +1,6 @@
 /**
  * A tiered secret store. A credential is read from the first place that answers, saved to the
- * strongest place that can be written, and cleared from every place on a remove.
+ * strongest place that can be written, and cleared from every place a save can reach.
  *
  * <p>{@link SecretStore#forApplication} builds one. The places are an environment variable, the
  * operating system's own credential store, and a permission-restricted file in a directory the
