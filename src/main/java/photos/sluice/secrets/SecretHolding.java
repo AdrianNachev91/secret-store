@@ -7,6 +7,9 @@ package photos.sluice.secrets;
  * can say that more than one place holds a value for one credential and which wins. It cannot say
  * they differ: nothing here compares values, by the same design that keeps a credential out of
  * {@link SecretStatus}.
+ *
+ * @param location {@link SecretStatus.Location} the place this answer is about
+ * @param holding {@link Holding} what that place answered when asked
  */
 public record SecretHolding(SecretStatus.Location location, Holding holding) {
 

@@ -6,19 +6,25 @@ a file protected by permissions in the app-data directory. The OS stores are Win
 Manager, the macOS keychain and the freedesktop Secret Service on Linux. Saves go to the
 strongest writable place, removes clear every place. The OS stores are bound through `java.lang.foreign`, so the library has no runtime
 dependency beyond the JDK. Round-trip tests run against the real stores on all three platforms in
-CI, on every push.
+CI, on every push that touches the code.
 
 The code was extracted from the Sluice photo organizer's `adapter/secrets` package, copied at
 Sluice commit `1eeca60` into this clean repository. Sluice keeps its own copy and does not consume
 this artifact yet. That is the constraint everything here is built under: **adopting this library
 must cost Sluice no refactor**. So every deviation from Sluice's code is priced in
-`docs/sluice-usage.md` before it is made.
+`tmp/sluice-usage.md` before it is made.
 
 ## Read first
-- `docs/design.md` - every locked decision, with the alternatives it beat. Coordinates, Java
-  version, the public surface, naming, the example, releases.
-- `docs/sluice-usage.md` - how Sluice composes and uses the store at the copied sha, and the
+- `docs/design.md` - the library's design, and public. The model, configuration, native keys, the
+  public surface, packaging, the Java floor, concurrency, refusals, releases. It says what the
+  library is, never how it got there, so keep it that way when you edit it.
+- `tmp/working-notes.md` - the plan, the alternatives each decision beat, and the measurements.
+- `tmp/sluice-usage.md` - how Sluice composes and uses the store at the copied sha, and the
   ledger of every deviation with its adoption cost. Written from Sluice's code, not from memory.
+
+  `tmp/` is gitignored apart from `.gitkeep`, so both files are local to one machine and neither
+  survives a clone. That is deliberate: none of it is public and all of it dies at the first
+  release.
 - When Sluice is checked out beside this repo, its source is at
   `../Sluice/app/src/main/java/photos/sluice/adapter/secrets/` and the six port types at
   `../Sluice/app/src/main/java/photos/sluice/application/port/out/Secret*.java` plus
@@ -28,11 +34,13 @@ must cost Sluice no refactor**. So every deviation from Sluice's code is priced 
 ## Coordinates and build
 - `photos.sluice:secret-store`, package `photos.sluice.secrets`. Maven, single module.
 - `maven.compiler.release` is the current GA JDK and moves up each March and September.
-- Dependencies: JSpecify (annotations, compile scope) and nothing else at runtime. Logging goes
+- Dependencies: JSpecify (annotations, `provided` scope) and nothing else at runtime. Logging goes
   through `System.Logger`. Tests use JUnit 5 and AssertJ only.
 - Build and test: `mvn test`. Surefire passes `--enable-native-access=ALL-UNNAMED`, and a
   consumer has to do the same; the README says so.
-- CI runs `mvn test` on `ubuntu-latest`, `windows-latest` and `macos-latest` on every push. The
+- CI runs `mvn test` on `ubuntu-latest`, `windows-latest` and `macos-latest`, on a push to `main`
+  or a pull request that touches `src/**`, `pom.xml` or the workflow itself. A docs-only change
+  runs nothing, so a green tick on the previous commit is what stands. The
   Ubuntu runner starts a headless Secret Service first; the recipe is the "Start a Secret Service
   (Ubuntu)" step of Sluice's `.github/workflows/ci.yml`.
 
@@ -49,7 +57,7 @@ must cost Sluice no refactor**. So every deviation from Sluice's code is priced 
   runner they are on.
 
 ## Working method
-- The work is three chunks, L1 to L3, described in `docs/design.md`. One chunk per session.
+- The work is the chunks in `tmp/working-notes.md`, L1 through L3. One chunk per session.
 - Every chunk: suite green locally first. Then a fresh review agent and a comment sweep over the
   diff, spawned together on Opus at high effort. Then commit on `main` and wait for the CI
   conclusion on all three runners before calling it done. No chunk branches; there is nothing a
@@ -61,6 +69,10 @@ must cost Sluice no refactor**. So every deviation from Sluice's code is priced 
 - Conventional commit messages, `feat`, `fix`, `docs`, `chore`, `ci`.
 - The README and any other public prose go through the `public-prose-review` skill before they
   are pushed for the first time.
+- The README's usage snippet stays in a ```java fence. IntelliJ injects Java into it and reports
+  a dozen parse errors, because a fragment is not a compilation unit. Decided 2026-09-03 to keep
+  them: GitHub is what the audience reads, and it renders the fence highlighted. Do not silence
+  them by dropping the language tag or by wrapping the snippet in a method.
 
 ## Only the repository owner can do these
 Needed for L3, the first publish. Not delegable.

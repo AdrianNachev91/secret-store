@@ -6,14 +6,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
-import photos.sluice.secrets.platform.Advapi32CredentialManager;
-import photos.sluice.secrets.platform.LibsecretService;
-import photos.sluice.secrets.platform.SecurityFrameworkKeychain;
+import photos.sluice.secrets.platform.PlatformBindings;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -226,7 +223,7 @@ class TieredSecretStoreTest {
             final var file = writableTier(SecretTierKind.FILE, 0, true, null);
             final SecretStore store = tieredSecretStore(environmentTier(null), file);
 
-            assertThatThrownBy(() -> store.save(ANTHROPIC, "s".repeat(SecretStore.MAX_SECRET + 1)))
+            assertThatThrownBy(() -> store.save(ANTHROPIC, "s".repeat(SecretStore.maxSecret() + 1)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("anthropic");
             assertThat(file.written).isEmpty();
@@ -236,7 +233,7 @@ class TieredSecretStoreTest {
         void measuresTheCeilingAgainstTheStrippedCredential() {
             final var file = writableTier(SecretTierKind.FILE, 0, true, null);
             final SecretStore store = tieredSecretStore(environmentTier(null), file);
-            final String atTheCeiling = "s".repeat(SecretStore.MAX_SECRET);
+            final String atTheCeiling = "s".repeat(SecretStore.maxSecret());
 
             store.save(ANTHROPIC, "  " + atTheCeiling + "\n");
 
@@ -468,23 +465,30 @@ class TieredSecretStoreTest {
     // tiers get registered and in what order, and a fake would be the answer rather than the check.
     //
     // The OS name is named rather than read from the machine, so these cases mean the same thing on
-    // every runner. A platform with no credential-store binding is the configuration that leaves
-    // the file tier answering, which is what all but the last of them are about.
+    // every runner.
     @Nested
-    class ForMachine {
+    class Building {
 
         private static final String NO_KEYRING = "FreeBSD";
 
-        // A fixture consumer rather than a real one. An entry these write into the runner's own
-        // credential store then cannot land under a name something real answers to.
+        // A fixture consumer rather than a real one. An entry these write is then unlikely to land
+        // on a name something real answers to. Nothing reserves either string, so the occupancy
+        // check in the routing test below is what actually protects a machine that holds one.
         private static final String APPLICATION = "SecretStoreFixture";
         private static final String NAMESPACE = "test.secretstore";
 
+        // Surefire sets this variable for the JVM the tests run in. Only a variable the process
+        // really carries separates the environment from another lookup of the same shape. A swap
+        // of System::getenv for something else therefore goes red here. A run outside Maven does
+        // not carry it, and the cases below assume it rather than failing.
+        private static final String FIXTURE_VARIABLE_NAME = "SECRET_STORE_FIXTURE_ENVIRONMENT";
+        private static final String FIXTURE_VALUE = "sk-synthetic-from-environment";
+        private static final SecretId FIXTURE_VARIABLE =
+                new SecretId("fixture-environment", FIXTURE_VARIABLE_NAME);
+
         @Test
         void storesThroughTheFileTierInTheDirectoryItWasHanded(@TempDir final Path secrets) {
-            final SecretStore store =
-                    TieredSecretStore.forMachine(APPLICATION, NAMESPACE, _ -> null, NO_KEYRING,
-                            secrets);
+            final SecretStore store = withoutAKeyring(secrets).open();
 
             store.save(ANTHROPIC, "sk-synthetic-0001");
 
@@ -495,27 +499,114 @@ class TieredSecretStoreTest {
 
         @Test
         void putsTheEnvironmentAheadOfTheStoredFile(@TempDir final Path secrets) {
-            final SecretStore store = TieredSecretStore.forMachine(APPLICATION, NAMESPACE,
-                    Map.of("ANTHROPIC_API_KEY", "from-environment")::get, NO_KEYRING, secrets);
-            store.save(ANTHROPIC, "sk-synthetic-0001");
+            assumeThat(System.getenv(FIXTURE_VARIABLE_NAME)).isNotNull();
+            final SecretStore store =
+                    withoutAKeyring(secrets).withEnvironmentOverride().open();
+            store.save(FIXTURE_VARIABLE, "sk-synthetic-0001");
 
-            assertThat(store.secret(ANTHROPIC)).contains("from-environment");
-            assertThat(store.status(ANTHROPIC))
-                    .isEqualTo(new SecretStatus.InEnvironment("ANTHROPIC_API_KEY"));
+            assertThat(store.secret(FIXTURE_VARIABLE)).contains(FIXTURE_VALUE);
+            assertThat(store.status(FIXTURE_VARIABLE))
+                    .isEqualTo(new SecretStatus.InEnvironment(FIXTURE_VARIABLE_NAME));
         }
 
         // A machine whose platform offers no credential store is still a machine that can keep a
-        // credential. The registration has to add the file tier unconditionally for that to hold.
+        // credential, as long as its caller named a directory.
         @Test
         void registersAWritableTierEvenWhereThePlatformOffersNoCredentialStore(
                 @TempDir final Path secrets) {
-            final SecretStore store =
-                    TieredSecretStore.forMachine(APPLICATION, NAMESPACE, _ -> null, NO_KEYRING,
-                            secrets);
+            final SecretStore store = withoutAKeyring(secrets).open();
 
             store.save(ANTHROPIC, "sk-synthetic-0001");
 
             assertThat(store.status(ANTHROPIC)).isEqualTo(new SecretStatus.InFile());
+        }
+
+        // storesThroughTheFileTierInTheDirectoryItWasHanded is the control this reads against. It
+        // names a directory on the same keyring-less platform and the save lands, so the only
+        // difference reaching the assertions below is the directory.
+        @Test
+        void namingNoDirectoryTurnsTheFileTierOff() {
+            final SecretStore store = SecretStore.forApplication(APPLICATION)
+                    .inNamespace(NAMESPACE)
+                    .onOperatingSystem(NO_KEYRING)
+                    .open();
+
+            assertThat(store.whereASaveWouldStoreIt()).isEmpty();
+            assertThatThrownBy(() -> store.save(ANTHROPIC, "sk-synthetic-0001"))
+                    .isInstanceOf(SecretStoreException.class)
+                    .hasMessageContaining("anthropic");
+        }
+
+        // Asked against the same variable both ways round, so the empty half means the place is
+        // absent rather than the variable being unset.
+        @Test
+        void leavesTheEnvironmentOutOfTheReadOrderWhereNoOverrideWasAskedFor(
+                @TempDir final Path secrets) {
+            assumeThat(System.getenv(FIXTURE_VARIABLE_NAME)).isNotNull();
+            final SecretStore consulting =
+                    withoutAKeyring(secrets).withEnvironmentOverride().open();
+            final SecretStore ignoring = withoutAKeyring(secrets).open();
+
+            assertThat(consulting.secret(FIXTURE_VARIABLE)).contains(FIXTURE_VALUE);
+            assertThat(consulting.holdings(FIXTURE_VARIABLE)).containsExactly(
+                    new SecretHolding(new SecretStatus.InEnvironment(FIXTURE_VARIABLE_NAME), HOLDS),
+                    new SecretHolding(new SecretStatus.InFile(), EMPTY));
+
+            assertThat(ignoring.secret(FIXTURE_VARIABLE)).isEmpty();
+            assertThat(ignoring.holdings(FIXTURE_VARIABLE))
+                    .containsExactly(new SecretHolding(new SecretStatus.InFile(), EMPTY));
+        }
+
+        @Test
+        void opensAStoreWithNoTierAtAll() {
+            final SecretStore store = SecretStore.forApplication(APPLICATION)
+                    .inNamespace(NAMESPACE)
+                    .onOperatingSystem(NO_KEYRING)
+                    .open();
+
+            assertThat(store.status(ANTHROPIC)).isEqualTo(new SecretStatus.Absent());
+            assertThat(store.holdings(ANTHROPIC)).isEmpty();
+        }
+
+        @Test
+        void refusesToOpenWithoutANamespace() {
+            final SecretStore.Builder builder = SecretStore.forApplication(APPLICATION);
+
+            assertThatThrownBy(builder::open)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("inNamespace");
+        }
+
+        // A null turned into a switched-off tier would report the machine as having nowhere to
+        // store a credential, blaming the machine for the caller's empty argument.
+        //
+        // The nulls below are what the inspection is for, so it is suppressed rather than obeyed.
+        // JSpecify is compile-time only and absent from a consumer's runtime, so a consumer that
+        // does not run the annotations reaches these methods with no warning at all.
+        @SuppressWarnings("DataFlowIssue")
+        @Test
+        void refusesANullWhereATierInputWasExpected() {
+            final SecretStore.Builder builder =
+                    SecretStore.forApplication(APPLICATION).inNamespace(NAMESPACE);
+
+            assertThatThrownBy(() -> builder.withCredentialFilesIn(null))
+                    .isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> builder.onOperatingSystem(null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+
+        @Test
+        void refusesABlankApplicationName() {
+            assertThatThrownBy(() -> SecretStore.forApplication(" "))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("application name");
+        }
+
+        @Test
+        void refusesABlankNamespace() {
+            assertThatThrownBy(() -> SecretStore.forApplication(APPLICATION).inNamespace(" "))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("namespace");
         }
 
         // Where the platform does offer one, the save has to reach it rather than the file. This is
@@ -530,10 +621,10 @@ class TieredSecretStoreTest {
         // keyring and not carrying one should go red rather than quietly skip.
         //
         // It writes into the real credential store of whoever runs it, and then clears what it
-        // wrote. Going through the tier means the entry name is built from a credential's name, and
-        // those are lower case by the rule that validates one. A capitalised name is therefore
-        // unavailable here. The fixture application name above
-        // is what keeps this out of any real consumer's entries.
+        // wrote. Going through the tier means the entry name is built from a credential's name,
+        // and those are lower case by the rule that validates one. A capitalised name is therefore
+        // unavailable here, and the fixture application name makes a real consumer's entry
+        // unlikely to share the key.
         //
         // So it refuses to touch an occupied name rather than trusting the name to be free. A
         // machine already holding something there skips instead, which loses a test on a machine
@@ -543,8 +634,10 @@ class TieredSecretStoreTest {
         void savesThroughTheCredentialStoreWherePlatformOffersOne(@TempDir final Path secrets) {
             final var fixture =
                     new SecretId("fixture-tier-routing", "SECRET_STORE_FIXTURE_TIER_ROUTING");
-            final SecretStore store = TieredSecretStore.forMachine(APPLICATION, NAMESPACE,
-                    _ -> null, System.getProperty("os.name"), secrets);
+            final SecretStore store = SecretStore.forApplication(APPLICATION)
+                    .inNamespace(NAMESPACE)
+                    .withCredentialFilesIn(secrets)
+                    .open();
             assumeThat(store.status(fixture))
                     .as("refusing to overwrite a credential this machine already holds")
                     .isEqualTo(new SecretStatus.Absent());
@@ -564,9 +657,9 @@ class TieredSecretStoreTest {
 
         // Asks the binding directly for the key the two naming inputs should have produced, which
         // is the one thing the store's own answers cannot show. Everything above reads back through
-        // the same tier that wrote, so it agrees with itself whatever name it chose. The inputs are
-        // two adjacent strings here and two more inside PlatformKeyring, and swapping either pair
-        // compiles. This is what goes red when one is swapped.
+        // the same tier that wrote, so it agrees with itself whatever name it chose. The builder
+        // takes the two inputs at separate named methods, but PlatformKeyring still passes them on
+        // as adjacent strings, and swapping them there compiles. This is what goes red then.
         //
         // Each platform's key carries a different one of the two. The Windows target and the macOS
         // service are built from the application name. The Secret Service schema is built from the
@@ -574,14 +667,21 @@ class TieredSecretStoreTest {
         private static boolean theBindingFound(final SecretId id) {
             final String osName = System.getProperty("os.name");
             if (PlatformKeyring.isWindows(osName)) {
-                return Advapi32CredentialManager.open()
+                return PlatformBindings.openWindowsCredentialManager()
                         .read(APPLICATION + ":" + id.name())
                         .isPresent();
             }
             if (PlatformKeyring.isMac(osName)) {
-                return SecurityFrameworkKeychain.open(APPLICATION).holds(id.name());
+                return PlatformBindings.openMacKeychain(APPLICATION).holds(id.name());
             }
-            return LibsecretService.open(NAMESPACE).holds(id.name());
+            return PlatformBindings.openLinuxSecretService(NAMESPACE).holds(id.name());
+        }
+
+        private static SecretStore.Builder withoutAKeyring(final Path secrets) {
+            return SecretStore.forApplication(APPLICATION)
+                    .inNamespace(NAMESPACE)
+                    .withCredentialFilesIn(secrets)
+                    .onOperatingSystem(NO_KEYRING);
         }
     }
 
@@ -721,12 +821,10 @@ class TieredSecretStoreTest {
         }
 
         @Override
-        public void write(final SecretId id, final String secret) {
-        }
+        public void write(final SecretId id, final String secret) {}
 
         @Override
-        public void erase(final SecretId id) {
-        }
+        public void erase(final SecretId id) {}
     }
 
     // Answers that it holds a credential and refuses to produce one, which is what a locked

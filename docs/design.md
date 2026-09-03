@@ -1,162 +1,145 @@
-# Design decisions
+# Design
 
-Locked 2026-09-02, over four rounds, before any code was written here. Each item records the
-alternatives it beat, so a later reader can tell a decision from a default. The reasoning that
-led here, and the sizing, live in the Sluice repository's own plan; this file is the working copy
-from L1 on.
+How the library is put together, and the rules it holds itself to.
 
-## Why the library exists
+## The model
 
-Every existing Java keyring library is abandoned. `com.github.javakeyring:java-keyring` has had
-no commit since September 2023, pins JNA 5.13 and was never tested past JDK 17. Microsoft's
-`credential-secure-storage-for-java` has been archived read-only since 2025-03-07, and its own CI
-never ran its round-trip tests. Both died the same way: JNA needed re-fixing as the JDK moved and
-nobody kept doing it. Hand-rolled `java.lang.foreign` bindings have no such moving part, and the
-native APIs underneath are frozen: `advapi32`'s `Cred*` since Windows XP, libsecret's password
-API since 2012, Security.framework's `SecItem*` since 10.6.
+A credential lives in one or more places. A store reads from each in order and the first to answer
+wins.
 
-The proof is real rather than claimed: round-trip tests against the actual credential store on
-all three CI runners.
+1. An environment variable.
+2. The operating system's own store: Windows Credential Manager, the macOS keychain, or the
+   freedesktop Secret Service.
+3. A permission-restricted file in a directory the consumer names.
 
-## The decisions
+A read tries every place. A save writes to the strongest place that can be written here, then
+clears any place above it. A fresh credential cannot then lose a read to a stale one sitting
+higher. A remove clears every place that can hold one. Clearing only the place that answered would
+expose an older credential underneath, which reads as a removal that silently failed. A save and a
+remove never touch an environment variable.
 
-**1. Its own public repository.** Not a module of Sluice's build. The library is upstream of an
-AGPL consumer, so it needs its own release cadence and licence. And GitHub Actions is free and
-unmetered on a public repository, which is what lets the macOS leg run on every push.
+Reading a credential is separate from reporting where it lives. `status` and `holdings` cannot
+return a credential at all, so a surface that shows where a key is stored cannot leak the key.
 
-**2. `photos.sluice:secret-store`, package `photos.sluice.secrets`.** A groupId names the
-publisher, not the subject, and Central only grants a namespace its owner has proven. The
-alternatives were an `io.github.<user>` namespace and a personal umbrella domain; the product
-domain won because a groupId migration is common enough that the option stays open. The name is
-wider than "keyring" because the library handles an environment variable and a user-owned file
-as well as the OS store; `secrets` and `credential-store` were the other candidates.
+## Configuring a store
 
-**3. Always the latest GA Java.** `maven.compiler.release` is the current JDK and moves up each
-March and September. A floor at 22, where `java.lang.foreign` went final and where the code
-already compiles, was rejected as one more thing to maintain. A consumer pinned to an LTS cannot
-use the library until it moves; that is the audience as chosen.
+```java
+SecretStore store = SecretStore.forApplication("YourApp")
+        .inNamespace("com.example.yourapp")
+        .withEnvironmentOverride()
+        .withCredentialFilesIn(configDirectory)
+        .open();
+```
 
-**4. `System.Logger` instead of SLF4J; JSpecify stays.** SLF4J in one class for two `info` lines
-was the only thing between the library and "no runtime dependency beyond the JDK". JSpecify is
-a compile-time annotation jar and part of what a public API promises. The README claim is exactly
-that: no runtime dependencies beyond the JDK, one annotation-only compile dependency.
+The two places that hold a credential in the clear are opt-in. Naming a directory turns the file
+on, naming none turns it off, and `withEnvironmentOverride()` does the same for the environment. A
+consumer under a policy against plaintext at rest refuses one or both. Tying the file to its
+directory leaves no way to express a directory nothing writes to, or a file place with nowhere to
+write.
 
-**5. Version 1 is closed.** A tier is one place a secret can live; the library ships three.
-Opening it would let a consumer add a fourth (a vault, a password manager, a cloud key service)
-by implementing a published interface. That is a compatibility promise nobody has asked for.
-`SecretTier` and `WritableSecretTier` stay package-private and `SecretStatus` stays sealed. A
-version 2 question if anyone asks. The public types are `SecretStore`, `SecretId`,
-`SecretStatus`, `SecretHolding`, `SecretStoreException`, `StaleSecretNotClearedException` and
-one factory holding what Sluice's `TieredSecretStore.forMachine` does.
+The operating system's own store is not switchable. It is used wherever the platform offers one,
+and it is the one place that needs no such refusal.
 
-**5b. The package tree is closed the same way, and splits in two steps.** Locked 2026-09-02,
-during L1. In Java the package is the visibility boundary, so a split buys a legible tree with
-either API surface or a module descriptor to re-close it. L1 moves the three binding interfaces
-and their implementations to `photos.sluice.secrets.platform`. That publishes six types which
-carry bytes under names the tier hands them, and no extension point, so decision 5 holds
-untouched. The tiers stay put until L2, because moving them publishes `SecretTier`,
-`WritableSecretTier` and `PlatformKeyring`, which is the promise decision 5 declines. L2 takes
-the full `secrets` / `secrets.tier` / `secrets.platform` tree together with a `module-info.java`
-exporting only `photos.sluice.secrets`, alongside the visibility pass that chunk already carries.
-The alternatives were staying flat, which nothing but the file count argues against, and opening
-the tier interfaces outright. Sluice pays nothing either way: it names only the public API types,
-and those never leave `photos.sluice.secrets`.
+A store naming neither plaintext place, on a machine with no credential store, reads nothing and
+refuses every save. That is a configuration rather than a mistake, so `open()` builds it, and
+`whereASaveWouldStoreIt()` is how a caller finds out in advance. A missing namespace throws at
+`open()` naming what is absent.
 
-L1's six is one more than the boundary strictly demands, and L2's visibility pass should weigh
-that. Only the three binding interfaces and some way of obtaining an instance have to cross the
-line. A public factory holding the three `open` calls would keep the three implementations
-package-private and publish four types rather than six.
+## Native keys
 
-**5c. A named configuration carrier is L2's to design, and these are the requirements it opens
-with.** Locked 2026-09-02, during L1, so that L2 reopens a decision rather than deriving one.
-L1 ships the naming inputs as two adjacent `String` parameters on `forMachine`, which is what
-decision 5's list of public types allows without an eighth. That shape has two known problems
-and one known extension, and all three want the same answer:
+The application name and the namespace decide every native key, by a fixed derivation. `<app>` is
+the application name and `<name>` is the credential's.
 
-- **The swap is silent.** `forMachine("photos.sluice", "Sluice", ...)` compiles and writes every
-  credential under keys nothing later reads. Two adjacent same-typed parameters is what makes it
-  invisible, and `PlatformKeyring.forThisMachine` repeats the pair one level down.
-- **Nothing pins the wiring, only the derivation.** The three literal-pinning tier tests build a
-  tier directly. So a swap in `PlatformKeyring`, or in `forMachine`'s call to it, leaves the
-  whole suite green on every runner. A test that saves through `forMachine` and reads the entry
-  back through the raw binding under the expected key is what closes it.
-- **A switch per tier, L2's, starting with turning the protected file off.** Locked 2026-09-02.
-  On by default, so Sluice passes nothing and its adoption line is unchanged. That
-  tier is the one place a credential sits unencrypted at rest, and a consumer under a policy
-  against that needs to refuse it. Two things the switch does not do, and the carrier's design
-  has to face both. The environment tier stays mandatory and first by decision 6, so plaintext
-  still answers ahead of everything. And a machine with no keyring and no file tier can read but
-  never save, which `whereASaveWouldStoreIt()` is the way to ask about in advance.
+| Place                      | Key it is written under                                                         |
+|----------------------------|---------------------------------------------------------------------------------|
+| Windows Credential Manager | target `<app>:<name>`, with `<name>` also the entry's account name              |
+| macOS keychain             | service `<app>`, account `<name>`, label `<app>:<name>`                         |
+| Secret Service             | schema `<namespace>.Credential`, attribute `name=<name>`, label `<app>:<name>`  |
+| Protected file             | `<name>` plus the tier's suffix, in the directory the consumer named            |
 
-The mechanism behind the third one is one conditional in `forMachine`, and the composition
-already handles a store with no writable tier at all. What is expensive is the parameter shape,
-which is why it waits for the chunk that decides the surface.
+Passing either input differently reaches different entries, so a consumer that changes one stops
+finding what it stored. Four tests pin the derivation against literals, and a round trip pins the
+wiring above it under a synthetic name.
 
-**6. Native naming is configuration the consumer passes: two inputs, fixed derivation.** The
-factory takes an application name and a namespace and derives every native key from them. The
-Windows target is `<name>:<entry>`, with `<entry>` also written as the entry's account name. The
-macOS service is `<name>`, its account is `<entry>` and its label `<name>:<entry>`. The libsecret
-schema is `<namespace>.Credential`, its attribute is `name=<entry>` and its label
-`<name>:<entry>`. The file is `<entry>` plus the tier's suffix, in the directory the consumer
-passes. Sluice's inputs are `"Sluice"` and `"photos.sluice"`, and those reproduce the keys Sluice
-writes today by construction. Four tests pin the derivation against those literals: one per tier
-against a fake store, and one on the schema name. They are not round trips, which is deliberate.
-A round trip would have to write Sluice's real keys into the credential store of whoever ran it.
-What no test pins is the wiring above the derivation, which decision 5c records. A builder exposing
-each native string was rejected as four knobs nothing needs; one can still grow them later
-without breaking two-input callers. Also here: `SecretId(provider, environmentVariable)` becomes
-`SecretId(name, environmentVariable)`, and messages say "credential 'x'" rather than "for
-provider 'x'". The environment tier stays mandatory and first, `MAX_SECRET` stays at 1,024, and
-`ReservedDeviceNames` is copied in as a package-private class.
+## The public surface
 
-**7. The example is a CRUD and nothing more.** Under `example/`, its own Maven project rather
-than a reactor module, depending on the published coordinates so that building it proves the
-artifact on Central rather than the working tree. One `Main.java` of about eighty lines: `store`,
-`read`, `where`, `forget` from the command line, printing which place answered. Built the way
-Sluice uses the store (see `sluice-usage.md`): same factory call, same read, status, save and
-remove. Any flexibility the example wants and Sluice does not is a ledger row before it is code.
+`SecretStore`, `SecretId`, `SecretStatus`, `SecretHolding`, `SecretStoreException` and
+`StaleSecretNotClearedException`, plus `SecretStore.Builder` nested in the first. Six top-level
+types, and the factory is a static on the interface rather than a seventh.
 
-**8. Publish from CI on a `v*` tag; `0.1.0` first, `1.0.0` when Sluice adopts it.** The tag
-workflow builds, signs with a GPG key from the repository secrets, and deploys through
-`org.sonatype.central:central-publishing-maven-plugin` with the portal token. Central is
-immutable, so the first version nobody has run does not promise stability. A real consumer
-running on it is the only proof that earns `1.0.0`; a fixed interval was rejected because it
-proves only that nobody looked.
+Version 1 is closed. A place is not an extension point: the tier interfaces are package-private
+and `SecretStatus` is sealed to `InEnvironment`, `InKeyring`, `InFile` and `Absent`. Opening it
+would promise compatibility for a fourth kind of place, which nothing has asked for.
 
-**9. Sluice does not consume the library yet.** It ships on the code it has now. The two copies
-diverge from `1eeca60`, a fix found in either is ported to the other by hand, and adoption is a
-later, unscheduled step. When it happens, the shape is known. Sluice deletes `adapter/secrets`
-and its six port types. Its application layer imports this library's `SecretStore` the way it
-imports `java.nio.file.Path`. Its `AppConfig.secretStore()` becomes one factory call.
+`SecretId` names a credential and the environment variable that overrides it. Both halves are
+required whether or not a given store consults the environment, so an id describes a credential
+rather than one store's configuration.
 
-**10. MIT, no CLA.** MIT contributions need no relicensing right, so a CLA has no work to do.
-The README's posture line: maintained best-effort, revisited each JDK release. No donation or
-sponsorship link, decided separately and not to be re-floated.
+## Packaging
 
-**11. Adoption costs Sluice no refactor, and every deviation is priced against that.** The
-separation in Sluice's `adapter/secrets` was already good enough to cut the library from as it
-stood, and that is the property to keep. Anything this library does differently is an
-abstraction Sluice handles at adoption as an import, a renamed call or one changed factory line.
-`sluice-usage.md` holds the account of Sluice's use and the ledger; counts in it are taken from
-Sluice's tree when a row is written, never estimated.
+Everything public lives in `photos.sluice.secrets`. The native bindings sit under
+`photos.sluice.secrets.platform`, which publishes four types: three binding interfaces and one
+factory that opens them. Each binding implementation stays package-private, so no native
+signature is a compatibility promise.
 
-## What is not decided
+`module-info.java` exports only `photos.sluice.secrets`. On the module path that seals the
+bindings, and a consumer grants native access by module name. On the classpath a module descriptor
+is ignored for access, so the split is a matter of layout there rather than enforcement.
 
-- Whether the API is ever generalised past the three built-in places. The tier composition
-  already generalises (one interface, one registration line, an ordering each tier declares).
-  What does not is `SecretStatus`, sealed to exactly `InEnvironment`, `InKeyring`, `InFile` and
-  `Absent`. A new kind of place has no variant to report through, and a consumer's exhaustive
-  switch would have to grow a case. A config-driven generic tier reporting through one generic
-  status variant is the candidate answer, deferred until someone needs it.
+Bindings reach the OS through `java.lang.foreign`, so there is no runtime dependency beyond the
+JDK and no binding layer to keep in step with it. JSpecify is compile-time only. Logging goes
+through `System.Logger`.
 
-## The chunks
+## Java version
 
-| Chunk | What lands                                                                                              |
-|-------|---------------------------------------------------------------------------------------------------------|
-| L1    | The code and its tests copied in under the new package, the native bindings in `secrets.platform`, the two-input naming, `name` for `provider`, `System.Logger`, the POM, and three-OS CI green on every push. |
-| L2    | Visibility pass on the public surface, the named configuration carrier of decision 5c and its switch for the file tier, the `secrets.tier` split and `module-info.java`, Javadoc for the surface, the README, `example/`, and the adoption ledger filled in from Sluice's tree. |
-| L3    | The `v*` tag workflow with signing and the Central deploy; `0.1.0` published; the example built against it. |
+The floor is the current LTS, and the major version carries it: `1.0.0` targets Java 25 and
+`2.0.0` targets 29. Raising a floor breaks a consumer sitting below it, so it is a major bump
+rather than a quiet change. `java.lang.foreign` is final from 22, which is the hard floor
+underneath the policy.
 
-L1 is a large diff and a move: about two hundred lines are real, the rest is relocation. Its
-review load is those lines plus the moved tests passing on three runners. L3's wall-clock is the
-owner's: the namespace verification, the TXT record, the GPG key and the portal token.
+## Concurrency
+
+A store holds no mutable state once opened and is safe to share between threads. A builder is not.
+
+Two concurrent saves of one credential are last-writer-wins, and neither corrupts what is stored.
+The file place writes a uniquely named temporary file and moves it atomically, so a credential file
+never holds a blend of two writes.
+
+A save racing a remove is the case to avoid. The remove can report success and the credential still
+be there afterwards. No library mechanism prevents that across processes, so a consumer with more
+than one writer serialises them.
+
+## Refusals
+
+A credential is at most 1,024 characters once stripped, refused here rather than by whatever the
+platform says when it runs out of room. A blank one is refused before any place is reached, since
+storing it would replace a working credential with something no service accepts.
+
+A credential name may hold only lower-case letters, digits and hyphens, and may not be a reserved
+Windows device name. The name becomes a path segment and part of a native entry name, so that
+leaves nothing to escape a directory with.
+
+A place that can answer neither yes nor no throws rather than reading as "no credential". That
+reading would send a user to re-enter a key already stored. `holdings` is the exception: it reports
+a place that refused the question, so one broken place cannot hide every healthy one's answer.
+
+## Releases
+
+Published from CI on a `v*` tag, signed with a GPG key from the repository secrets, through the
+Central publishing plugin. Central is immutable, so a first version nobody has run does not promise
+stability. `1.0.0` follows a real consumer running on it.
+
+`example/` is a separate Maven project resolving the released artifact rather than a module of this
+build, so building it proves what was published.
+
+## Licence
+
+MIT, no contributor licence agreement, since MIT contributions need no relicensing right.
+
+## Not decided
+
+Whether the API is ever generalised past the three built-in places. The composition already
+generalises, being one interface and an ordering each place declares. `SecretStatus` does not. It
+is sealed to four variants, so a new kind of place has no variant to report through. A consumer's
+exhaustive switch would have to grow a case. A config-driven place reporting through one generic
+variant is the candidate answer, deferred until someone needs it.

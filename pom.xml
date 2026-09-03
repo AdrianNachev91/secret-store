@@ -72,6 +72,16 @@
         <configuration>
           <!-- A consumer has to pass this flag too. -->
           <argLine>--enable-native-access=ALL-UNNAMED</argLine>
+          <!-- With module-info.java present, Surefire would put the tests on the module path,
+               where their package-private access across the tree stops resolving. On the classpath
+               they are in the unnamed module, which is what the flag above grants. -->
+          <useModulePath>false</useModulePath>
+          <!-- Read back by the one test that pins withEnvironmentOverride() against the real
+               process environment. Nothing else can tell System::getenv from another lookup of
+               the same shape. -->
+          <environmentVariables>
+            <SECRET_STORE_FIXTURE_ENVIRONMENT>sk-synthetic-from-environment</SECRET_STORE_FIXTURE_ENVIRONMENT>
+          </environmentVariables>
         </configuration>
       </plugin>
     </plugins>

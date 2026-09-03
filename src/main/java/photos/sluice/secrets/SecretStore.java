@@ -1,5 +1,6 @@
 package photos.sluice.secrets;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +28,9 @@ public interface SecretStore {
     // can still be refused by Windows instead. Held here rather than on a value type because a
     // credential never becomes one. It goes from a caller's input to a tier, and nothing in
     // between models it.
+    /**
+     * The character ceiling a credential is measured against, once stripped.
+     */
     int MAX_SECRET = 1024;
 
     /**
@@ -37,6 +41,86 @@ public interface SecretStore {
      */
     static int maxSecret() {
         return MAX_SECRET;
+    }
+
+    /**
+     * Starts building a store for the named application.
+     *
+     * <p>The name is what a user browsing their own credential store sees.
+     *
+     * @param applicationName {@link String} the consumer's own name
+     * @return {@link Builder} the builder to name the rest on and open
+     * @throws IllegalArgumentException when the name is blank
+     */
+    static Builder forApplication(final String applicationName) {
+        return new SecretStoreBuilder(applicationName);
+    }
+
+    /**
+     * Collects the places a store reads from, then opens it.
+     *
+     * <p>The two tiers that hold a credential in the clear are opt-in. An environment variable is
+     * plaintext by nature, and a credential file is unencrypted at rest. A consumer under a policy
+     * against either has to be able to leave it out, so neither is on until a call here names it.
+     * The machine's own credential store is not switchable.
+     *
+     * <p>So a store naming neither plaintext tier, on a machine with no credential store, reads
+     * nothing and refuses every save. {@link SecretStore#whereASaveWouldStoreIt} answers that in
+     * advance; {@link #open} does not refuse the configuration.
+     *
+     * <p>The application name and the namespace decide every native key, by a fixed derivation.
+     * The Windows target is {@code <applicationName>:<name>}, with {@code <name>} also written as
+     * the entry's account name. The macOS service is {@code <applicationName>}, its account is
+     * {@code <name>} and its label {@code <applicationName>:<name>}. The Secret Service schema is
+     * {@code <namespace>.Credential}, its attribute is {@code name=<name>} and its label
+     * {@code <applicationName>:<name>}. The file is {@code <name>} plus the tier's own suffix.
+     * Here {@code <name>} is the {@link SecretId}'s. Passing either input differently reaches
+     * different entries, so a caller that changes one stops finding what it stored.
+     */
+    interface Builder {
+
+        /**
+         * The namespace the Secret Service schema is built from, and the one input with no default.
+         *
+         * @param namespace {@link String} the consumer's reverse-domain namespace
+         * @return {@link Builder} this builder
+         * @throws IllegalArgumentException when the namespace is blank
+         */
+        Builder inNamespace(String namespace);
+
+        /**
+         * Reads the process's environment ahead of every stored place, under the variable name
+         * each {@link SecretId} carries.
+         *
+         * @return {@link Builder} this builder
+         */
+        Builder withEnvironmentOverride();
+
+        /**
+         * Keeps credentials in permission-restricted files in the given directory, below whatever
+         * credential store the machine offers.
+         *
+         * @param directory {@link Path} the directory holding one file per credential
+         * @return {@link Builder} this builder
+         */
+        Builder withCredentialFilesIn(Path directory);
+
+        /**
+         * Decides which platform's credential store to look for, rather than asking this machine.
+         *
+         * @param osName {@link String} the raw OS name, as the os.name system property reports it
+         * @return {@link Builder} this builder
+         */
+        Builder onOperatingSystem(String osName);
+
+        /**
+         * Opens the store over the tiers named so far, plus this machine's credential store where
+         * it offers one.
+         *
+         * @return {@link SecretStore} the credential store
+         * @throws IllegalStateException when no namespace was named
+         */
+        SecretStore open();
     }
 
     /**

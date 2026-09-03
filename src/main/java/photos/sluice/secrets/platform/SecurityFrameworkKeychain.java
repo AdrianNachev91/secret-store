@@ -50,7 +50,7 @@ import java.util.Optional;
  * <p>A failure arrives as an {@code OSStatus}, an integer the caller reads and this class turns into
  * a refusal.
  */
-public final class SecurityFrameworkKeychain implements MacKeychain {
+final class SecurityFrameworkKeychain implements MacKeychain {
 
     /**
      * {@code kCFStringEncodingUTF8}, from CoreFoundation's own built-in encodings.
@@ -191,7 +191,7 @@ public final class SecurityFrameworkKeychain implements MacKeychain {
      *         exports none of the names read here
      * @throws UnsatisfiedLinkError when a framework is present but cannot be loaded
      */
-    public static MacKeychain open(final String service) {
+    static MacKeychain open(final String service) {
         return open(service, null);
     }
 
@@ -702,8 +702,9 @@ public final class SecurityFrameworkKeychain implements MacKeychain {
         /**
          * Resolves one symbol, refusing rather than answering with nothing.
          *
-         * <p>A framework that loads but is missing a name then leaves {@link #open()} the same way
-         * a missing framework does. What either one means is the caller's ruling, not this class's.
+         * <p>A framework that loads but is missing a name then leaves
+         * {@link SecurityFrameworkKeychain#open(String)} the same way a missing framework does.
+         * What either one means is the caller's ruling, not this class's.
          *
          * @param symbolName {@link String} the exported name
          * @return {@link MemorySegment} the symbol's own address

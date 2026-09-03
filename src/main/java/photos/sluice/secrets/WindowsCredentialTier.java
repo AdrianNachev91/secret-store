@@ -127,8 +127,8 @@ final class WindowsCredentialTier implements WritableSecretTier {
      * that is already stored.
      *
      * <p>A store refusing everything is a different fact, and returning quietly is what says so.
-     * The protected file is where such a machine keeps its credential, because the same answer
-     * sends its save there.
+     * The same answer sends a save past this tier, down to whatever writable tier sits below it.
+     * Where the consumer named none, the save is refused instead.
      *
      * <p>The trade, taken deliberately. A machine that stored a credential and lost access to its
      * store afterwards keeps that credential through a removal, and hears the removal succeed.

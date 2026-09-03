@@ -35,7 +35,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
  * <p>Every failure is read from {@code GetLastError} rather than guessed from a false return. The
  * code for a missing entry is the one this class treats as an answer instead of a fault.
  */
-public final class Advapi32CredentialManager implements WindowsCredentialManager {
+final class Advapi32CredentialManager implements WindowsCredentialManager {
 
     /**
      * The layout Windows documents for {@code CREDENTIALW}, which comes out at 80 bytes on a 64-bit
@@ -117,7 +117,7 @@ public final class Advapi32CredentialManager implements WindowsCredentialManager
      *         exports none of the functions named here
      * @throws UnsatisfiedLinkError when the library is present but cannot be loaded
      */
-    public static WindowsCredentialManager open() {
+    static WindowsCredentialManager open() {
         return new Advapi32CredentialManager(
                 SymbolLookup.libraryLookup("advapi32.dll", Arena.global()));
     }

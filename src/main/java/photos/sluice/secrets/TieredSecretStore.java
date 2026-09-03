@@ -1,13 +1,9 @@
 package photos.sluice.secrets;
 
-import org.jspecify.annotations.Nullable;
-
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * Puts the machine's credential tiers in order and applies each operation to the tiers it belongs
@@ -22,57 +18,35 @@ import java.util.function.Function;
  * in a tier above the one it wrote to has the same shape. The fresh credential is stored, and
  * still loses every read to whatever was already sitting higher up.
  *
- * <p>The environment sits ahead of every stored tier on a read.
+ * <p>The environment sits ahead of every stored tier on a read, where the caller asked for one at
+ * all.
  */
-public class TieredSecretStore implements SecretStore {
+class TieredSecretStore implements SecretStore {
 
     private final List<WritableSecretTier> writable;
     private final List<SecretTier> readOrder;
 
     /**
-     * Builds the store over the tiers this machine offers. The one place a tier is registered, so
-     * adding a platform's credential store is a change here and nowhere else. The tiers themselves
-     * stay inside this package.
+     * Creates the store over the writable tiers alone, with no environment tier ahead of them.
      *
-     * <p>The file tier is always registered and the keyring tier only where the platform offers
-     * one. So a machine with no credential store is not a machine with nowhere to keep a credential.
-     *
-     * <p>Every native key is derived from the first two arguments, and the derivation is fixed.
-     * The Windows target and the macOS and Linux labels are {@code <applicationName>:<name>}, the
-     * macOS service is {@code <applicationName>}, and the Secret Service schema is
-     * {@code <namespace>.Credential}. Passing different values reaches different entries, so a
-     * caller that changes them stops finding what it stored.
-     *
-     * @param applicationName {@link String} the consumer's own name, as a user browsing their
-     *         credential store should see it
-     * @param namespace {@link String} the consumer's reverse-domain namespace
-     * @param environment a {@link Function} resolving an environment variable name to its value,
-     *         normally {@code System::getenv}
-     * @param osName {@link String} the raw OS name (e.g. system property os.name), which decides
-     *         which platform's credential store is looked for
-     * @param secretsDirectory {@link Path} the directory the file tier keeps credentials in
-     * @return {@link SecretStore} the credential store for this machine
+     * @param writable a {@link List} of {@link WritableSecretTier} the tiers a credential can be
+     *         stored in
      */
-    public static SecretStore forMachine(final String applicationName, final String namespace,
-            final Function<String, @Nullable String> environment, final String osName,
-            final Path secretsDirectory) {
-        final List<WritableSecretTier> tiers = new ArrayList<>(2);
-        PlatformKeyring.forThisMachine(applicationName, namespace, osName).ifPresent(tiers::add);
-        tiers.add(new FileSecretTier(secretsDirectory));
-        return new TieredSecretStore(new EnvironmentSecretTier(environment), tiers);
+    TieredSecretStore(final List<WritableSecretTier> writable) {
+        this.writable = byPrecedence(writable);
+        this.readOrder = List.copyOf(this.writable);
     }
 
     /**
-     * Creates the store over the environment tier and whichever writable tiers this build offers,
-     * ordered by their own declared precedence.
+     * Creates the store over the environment tier and the writable tiers, ordered by their own
+     * declared precedence.
      *
      * @param environment {@link SecretTier} the environment-variable tier, always tried first
-     * @param writable a {@link List} of {@link WritableSecretTier} the tiers a credential can be stored in
+     * @param writable a {@link List} of {@link WritableSecretTier} the tiers a credential can be
+     *         stored in
      */
     TieredSecretStore(final SecretTier environment, final List<WritableSecretTier> writable) {
-        this.writable = writable.stream()
-                .sorted(Comparator.comparingInt(WritableSecretTier::precedence).reversed())
-                .toList();
+        this.writable = byPrecedence(writable);
         final List<SecretTier> order = new ArrayList<>(this.writable.size() + 1);
         order.add(environment);
         order.addAll(this.writable);
@@ -132,6 +106,18 @@ public class TieredSecretStore implements SecretStore {
         if (!failures.isEmpty()) {
             throw clearingFailed(id, failures);
         }
+    }
+
+    /**
+     * Puts the writable tiers in the order a read and a save consult them, strongest first.
+     *
+     * @param writable a {@link List} of {@link WritableSecretTier} the tiers as handed over
+     * @return a {@link List} of {@link WritableSecretTier} the same tiers in precedence order
+     */
+    private static List<WritableSecretTier> byPrecedence(final List<WritableSecretTier> writable) {
+        return writable.stream()
+                .sorted(Comparator.comparingInt(WritableSecretTier::precedence).reversed())
+                .toList();
     }
 
     /**

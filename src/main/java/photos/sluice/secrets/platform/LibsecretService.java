@@ -50,7 +50,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
  * memory discipline. GLib frees the error and the search list, and GObject supplies the release
  * function each search result needs.
  */
-public final class LibsecretService implements LinuxSecretService {
+final class LibsecretService implements LinuxSecretService {
 
     /**
      * The layout libsecret documents for {@code SecretSchema}. The attribute table is a fixed
@@ -182,7 +182,7 @@ public final class LibsecretService implements LinuxSecretService {
      *         one of them exports none of the functions named here
      * @throws UnsatisfiedLinkError when a library is present but cannot be loaded
      */
-    public static LinuxSecretService open(final String namespace) {
+    static LinuxSecretService open(final String namespace) {
         return open(namespace, DEFAULT_COLLECTION);
     }
 
