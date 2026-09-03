@@ -109,6 +109,11 @@ A save racing a remove is the case to avoid. The remove can report success and t
 be there afterwards. No library mechanism prevents that across processes, so a consumer with more
 than one writer serialises them.
 
+A save is not refused merely because something else removed the entry while it ran. Replacing a
+credential in the macOS place takes two calls, an add and then an update, and a removal landing
+between them starts the save over. It starts over once. An entry put back and removed again during
+that second pass is reported as a failure.
+
 ## Refusals
 
 A credential is at most 1,024 characters once stripped, refused here rather than by whatever the
