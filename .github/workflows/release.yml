@@ -34,18 +34,20 @@ jobs:
           git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD \
             || { echo "${GITHUB_REF_NAME} names ${GITHUB_SHA}, which is not on main"; exit 1; }
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
           # The username, password and passphrase below are names of environment variables rather
-          # than values. setup-java writes them into a settings.xml that the build dereferences.
+          # than values. setup-java writes a settings.xml naming them, and the build reads the
+          # environment through it. The passphrase arrives as a `gpg.passphraseEnvName` property,
+          # which maven-gpg-plugin honours from 3.2.0. This POM pins 3.2.8.
           server-id: central
           server-username: MAVEN_CENTRAL_USERNAME
           server-password: MAVEN_CENTRAL_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+          gpg-passphrase-env-var: MAVEN_GPG_PASSPHRASE
 
       # A tag is typed by hand and a published version is permanent. Nothing further down catches
       # the two disagreeing, since both are valid on their own. The help plugin carries a version
