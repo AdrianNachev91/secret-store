@@ -157,18 +157,22 @@ machine is the one that never had a keyring, and this is the trade that keeps it
 ## Releases
 
 A release is published from CI on a `v*` tag, signed with a GPG key from the repository secrets,
-through the Central publishing plugin. The workflow refuses a tag whose name disagrees with the
-POM's version, runs the suite, then signs and uploads in one invocation. The upload validates and
-then waits. Putting a version on Central stays a person's button in the Portal rather than a tag's
-side effect. Central is immutable, so a version number is a promise. `1.0.0` says the surface is
-closed rather than settling, which the sealed `SecretStatus` and the package-private tier
-interfaces already enforce. Its evidence is one consumer's suite migrated onto the library and
-run, and one credential read back across the two under the same native key, on Windows alone.
+through the Central publishing plugin. The workflow refuses two kinds of tag before it builds
+anything. One whose name disagrees with the POM's version, and one naming a commit `main` does not
+carry. The second matters because the release leg tests on Ubuntu alone, and `main` is where the
+Windows and macOS runners are. It then runs the suite, signs and uploads in one invocation. The
+upload validates and then waits. Putting a version on Central stays a person's button in the Portal
+rather than a tag's side effect. Central is immutable, so a version number is a promise. `1.0.0`
+says the surface is closed rather than settling, which the sealed `SecretStatus` and the
+package-private tier interfaces already enforce. Its evidence is one consumer's suite migrated onto
+the library and run, and one credential read back across the two under the same native key, on
+Windows alone.
 
 `example/` is a separate Maven project rather than a module of this build. Its POM names the
-library version in one property, which the release sets to the version it just published. Building
-the example then proves the artifact rather than the tree it came from. Until `1.0.0` is published
-that property names the snapshot.
+library version in one property, set to the version that opened the current major. Building the
+example then proves the artifact rather than the tree it came from. It moves on a major and not
+otherwise, because the API is closed within one. So the example demonstrates the floor of the range
+it applies to rather than a tip nobody needs.
 
 ## Licence
 
@@ -185,3 +189,25 @@ variant is the candidate answer, deferred until someone needs it.
 Shipping `1.0.0` prices that deferral. A fifth variant is a breaking change from here, so answering
 this question costs a major version rather than a minor one. That is the trade the sealed type was
 chosen for, taken deliberately.
+
+Whether the credential file is ever encrypted. Owner-only permissions are what it carries today.
+The gap they leave is a copy taken off the machine: a backup, a synced folder, a disk read without
+full-disk encryption. Encryption is the obvious answer, and every version of it fails on where the
+key lives.
+
+A passphrase needs an interactive prompt, which a library should not own, and the machines this
+place exists for are the headless ones that cannot answer. A key beside the file protects against
+nothing the permissions already cover, since whatever reads one reads the other. A key in the
+operating system's store is circular, this place being what a machine without a usable one falls
+back to.
+
+That leaves two. A key derived from the machine needs no new input, and is obfuscation rather than
+encryption, since anything running as the user derives it too. What it buys is the copied file.
+What it costs is that a reinstall or a hardware change makes a stored credential unreadable,
+silently, looking like corruption rather than a key that moved. For a library that refuses to let a
+present credential read as absent, that is the wrong direction. A key the consumer supplies is the
+honest form, moving the same question up to somebody who may have a real answer for it.
+
+Either way the file gains a state it cannot report. A credential that is present and will not
+decrypt is neither held nor absent. So this needs the same fifth variant as the question above, and
+lands with it in a major version.

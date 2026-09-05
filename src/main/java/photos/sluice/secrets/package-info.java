@@ -4,8 +4,9 @@
  *
  * <p>{@link SecretStore#forApplication} builds one. The places are an environment variable, the
  * operating system's own credential store, and a permission-restricted file in a directory the
- * consumer names. The two that hold a credential in the clear are named on the builder or left
- * out. The operating system's own store is used wherever the platform offers one.
+ * consumer names. The environment variable and the file hold a credential in the clear, so each is
+ * named on the builder or left out. The operating system's own store is used wherever the platform
+ * offers one.
  *
  * <p>Reaching that store needs native access. A consumer on the classpath passes
  * {@code --enable-native-access=ALL-UNNAMED}, and one on the module path passes

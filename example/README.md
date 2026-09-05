@@ -1,4 +1,4 @@
-# secret-store example
+# Secret Store example
 
 A command-line CRUD over one credential. It stores, reads, locates and clears
 `SecretId("anthropic", "ANTHROPIC_API_KEY")`, and prints which place answered without ever
@@ -7,9 +7,10 @@ printing the credential.
 ## Build and run it
 
 This is its own Maven project rather than a module of the library's build. The library version it
-resolves is the `secret-store.version` property in the example's own POM. The release sets that to
-the version it just published, so that building this proves the artifact as published rather than
-the tree it came from.
+resolves is the `secret-store.version` property in the example's own POM. It names the version that
+opened the current major, so building this proves the artifact as published rather than the tree it
+came from. The API is closed within a major, so the example compiles against every later version in
+it too.
 
 ```
 git clone https://github.com/AdrianNachev91/secret-store.git
@@ -18,8 +19,9 @@ mvn package
 java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar where
 ```
 
-Until `1.0.0` is on Central that property names the snapshot, so the library has to be built first.
-Insert `mvn install` in the repository root before changing into `example`.
+The property names a published version, so a plain clone resolves it from Central. To build against
+this checkout instead, point the property at the snapshot and run `mvn install` in the repository
+root before changing into `example`.
 
 `mvn package` writes `target/secret-store-example.jar` and copies the library beside it into
 `target/lib`, which the jar's manifest points at. `java -jar` ignores any classpath given on the

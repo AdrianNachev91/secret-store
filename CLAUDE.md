@@ -1,4 +1,4 @@
-# secret-store
+# Secret Store
 
 A tiered secret store for Java. A credential is read from the first place that answers, saved to the
 strongest place that can be written, and cleared from every place a save can reach. The places, in
@@ -32,15 +32,17 @@ Manager, the macOS keychain and the freedesktop Secret Service. They are bound t
   `src/**`, `pom.xml` or the workflow itself. A docs-only change outside `example/` runs nothing, so
   a green tick on the previous commit is what stands. The Ubuntu runner starts a headless Secret
   Service first.
-- `example.yml` is a second workflow, on Ubuntu alone. It installs the library, builds the example
-  against it and runs the jar. That is the only place the example is compiled at all, and it fires
-  on a change under `example/` as well. It installs no `libsecret`, so the binding cannot load, the
-  keyring place is absent from the listing entirely, and `where` still answers off the file place.
-  That is a different state from a machine whose `libsecret` loads over a session with no D-Bus,
-  where the place stays listed and answers nothing.
+- `example.yml` is a second workflow, on Ubuntu alone. It builds the example against the library
+  version the example's POM names and runs the jar. That is the only place the example is compiled
+  at all, and it fires on a change under `example/` as well. It installs no `libsecret`, on
+  purpose, so the run doubles as proof that a machine with no credential store falls through to the
+  file. Do not add the apt and dbus setup `ci.yml` has.
 
 ## Conventions
-- Every class under `src/main/java` gets a `/** */` block. Test files use `//` only.
+- Every class, interface, enum, record and nested type under `src/main/java` gets a `/** */` block,
+  as does every method and every enum constant. A method carrying `@Override` is the exception,
+  inheriting the documentation of what it implements. Fields take a comment only where one is
+  needed, in whichever form fits. Test files use `//` only.
 - A comment says only what a reader cannot get from the finished code once. No change narration, no
   pointer at a neighbour to complete a thought, no explanation of how callers use a method.
 - The tier and the native binding under it stay separate classes. The tier decides what an answer
@@ -54,7 +56,9 @@ Manager, the macOS keychain and the freedesktop Secret Service. They are bound t
 - Real collaborators in tests: the round-trip tests write to the real credential store of the runner
   they are on.
 - A test secret is a synthetic string. No real credential, no personal path and no person's name in
-  code, comments or docs, beyond the repository's own URL and the copyright line in `LICENSE`.
+  code, comments or docs. Three places carry the author's name because they are what a publisher
+  signs: the repository's own URL, the copyright line in `LICENSE`, and the `developers` block in
+  `pom.xml`, which is what the Central listing shows.
 - The transcripts in `example/README.md` are real runs, pasted. Changing what the CLI prints means
   running the Windows sequence again, and taking the runner's `where` from the latest Example
   workflow log.

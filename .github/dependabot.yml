@@ -1,0 +1,25 @@
+version: 2
+
+# Two ecosystems, because the release path spans both. A stale action is the likelier problem of the
+# two: the workflows pin major tags that move under them, and one of those workflows signs and
+# publishes. The Maven side is four dependencies and a handful of pinned plugins.
+updates:
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+
+  # The example is its own Maven project rather than a module of this build, so it needs its own
+  # entry. Its one dependency is this library, and a bump there is a release step rather than
+  # something to accept from a pull request.
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+    ignore:
+      - dependency-name: photos.sluice:secret-store

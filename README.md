@@ -1,4 +1,4 @@
-# secret-store
+# Secret Store
 
 [![CI](https://github.com/AdrianNachev91/secret-store/actions/workflows/ci.yml/badge.svg)](https://github.com/AdrianNachev91/secret-store/actions/workflows/ci.yml)
 
@@ -44,8 +44,8 @@ Reaching the operating system's store needs a native-access grant, which a consu
 </dependency>
 ```
 
-Until `1.0.0` is published, build from source instead: clone this repository, `mvn install`, then
-depend on `1.0.0-SNAPSHOT`.
+To depend on a version Central does not serve yet, clone this repository, `mvn install`, then name
+the snapshot instead.
 
 The groupId is the domain the publisher verified with Central, not a statement about the subject.
 The code was cut out of a photo organizer, and nothing photo-specific survived the cut.
@@ -200,10 +200,14 @@ Central is immutable, so a version number is a promise. `1.0.0` says the surface
 than settling. The tier interfaces are package-private and `SecretStatus` is sealed, so a fourth
 kind of place cannot arrive without a major version.
 
-The evidence behind that is one consumer, the application this was cut out of. Its whole test suite
-was migrated onto this library and run. A credential its own code had stored was then read back
-through this one, under the same native key. That was on Windows. macOS and Linux key compatibility
-is unproven, and a key that differs by one character reports a stored credential as absent.
+Every platform's real store is exercised on every change. CI runs the suite against the Windows
+Credential Manager, the macOS keychain and a Secret Service, on their own runners.
+
+One further check has run on Windows alone. The application this was cut out of had its whole test
+suite migrated onto this library. A credential its own code had stored was then read back through
+this one, under the same native key. No runner can repeat that, holding no credential the older
+code wrote. So a consumer migrating off an earlier copy of this code on macOS or Linux is doing
+something only Windows has seen work.
 
 Maintained best-effort, revisited each JDK release.
 
