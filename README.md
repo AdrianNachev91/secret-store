@@ -45,7 +45,7 @@ Reaching the operating system's store needs a native-access grant, which a consu
 ```
 
 To depend on a version Central does not serve yet, clone this repository, `mvn install`, then name
-the snapshot instead.
+whatever version its POM carries.
 
 The groupId is the domain the publisher verified with Central, not a statement about the subject.
 The code was cut out of a photo organizer, and nothing photo-specific survived the cut.

@@ -20,8 +20,8 @@ java --enable-native-access=ALL-UNNAMED -jar target/secret-store-example.jar whe
 ```
 
 The property names a published version, so a plain clone resolves it from Central. To build against
-this checkout instead, point the property at the snapshot and run `mvn install` in the repository
-root before changing into `example`.
+this checkout instead, point the property at the version in the repository root's POM and run
+`mvn install` there first.
 
 `mvn package` writes `target/secret-store-example.jar` and copies the library beside it into
 `target/lib`, which the jar's manifest points at. `java -jar` ignores any classpath given on the
