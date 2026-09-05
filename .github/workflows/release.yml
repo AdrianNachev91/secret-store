@@ -17,7 +17,7 @@ jobs:
     steps:
       # The ancestry check below reads main's history down to the tagged commit. A default checkout
       # of a tag fetches neither main nor that history.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
