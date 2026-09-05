@@ -22,11 +22,9 @@ class SecurityFrameworkKeychainTest {
     private static final String NEVER_STORED = NAME_PREFIX + "never-stored";
     private static final String LABEL = "secret-store test fixture";
 
-    // The status codes are transcribed here a second time, straight from Apple's SecBase.h, and the
-    // duplication is the point. The production constants are hand-copied integers in a class only one
-    // runner executes. A transposed digit there is invisible to the compiler, the IDE and
-    // every other test. It would surface only as a user seeing a bare number where a sentence
-    // belonged. Two independent transcriptions disagree the moment either one is wrong.
+    // Transcribed a second time, straight from Apple's SecBase.h, and the duplication is the point.
+    // A transposed digit in the production constants is invisible to the compiler, the IDE and
+    // every other test. Two independent transcriptions disagree the moment either one is wrong.
     //
     // These run on every runner, unlike the native cases below, because nothing here calls out.
     @Nested
@@ -75,7 +73,7 @@ class SecurityFrameworkKeychainTest {
         }
     }
 
-    // A transposed digit here misroutes a call: an absent item stops reading as absent, or a fresh
+    // A wrong constant here misroutes a call: an absent item stops reading as absent, or a fresh
     // add stops reading as a clash needing an update.
     @Nested
     class ControlFlowCodes {
@@ -111,9 +109,9 @@ class SecurityFrameworkKeychainTest {
     @Timeout(value = 30, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     class AgainstTheRealKeychain {
 
-        // Binding here rather than through the selector is deliberate. The selector turns a refusal
-        // into an absent tier, which would quietly reduce these cases to no-ops if the binding were
-        // ever built wrong. Calling the binding directly means that fails the build instead.
+        // Binding here rather than through PlatformKeyring is deliberate. That route turns a
+        // refusal into an absent tier, which would quietly reduce these cases to no-ops if the
+        // binding were ever built wrong. Calling the binding directly means that fails the build.
         private final MacKeychain keychain = SecurityFrameworkKeychain.open("SecretStoreFixture");
 
         @AfterEach

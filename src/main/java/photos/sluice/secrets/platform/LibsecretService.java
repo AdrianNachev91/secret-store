@@ -11,6 +11,7 @@ import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
 
@@ -28,19 +29,20 @@ import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
  *
  * <p>Nothing here checks any of that, and nothing needs to. A version that does not resolve one of
  * these symbols leaves no keyring tier registered, so the machine keeps its credential in the
- * protected file. The selector records which symbol was missing, which separates an install too
- * old to serve this library from a machine carrying no libsecret at all.
+ * protected file. The binding's own failure names the missing symbol, which separates an install
+ * too old to serve this library from a machine carrying no libsecret at all.
  *
  * <p>A store names the service's default collection. Reads, searches and removals name none and
  * span every collection, so an entry the user later moves is still found. Each is identified by a
  * schema built from the consumer's namespace plus one attribute carrying the entry name.
  *
  * <p>The schema is what makes a shared keyring safe to work in. The service matches on it, since
- * the flag that would disable that is deliberately not set. So a credential belonging to any other
- * application answers to a different schema, and no lookup, search or removal made here can reach
- * it. Nothing about this depends on the entry names being unusual.
+ * the flag that would disable that is deliberately not set. So a credential stored under a
+ * different schema is out of reach of every lookup, search and removal made here. Two consumers
+ * choosing one namespace share a schema. Nothing about this depends on the entry names being
+ * unusual.
  *
- * <p>The four search-and-store functions bound here are variadic in C, taking attribute name and
+ * <p>The search-and-store functions bound here are variadic in C, taking attribute name and
  * value pairs closed by a null. So each of their descriptors names where the variadic part begins,
  * and each of those calls passes exactly one pair. The release functions take fixed arguments.
  *
@@ -89,7 +91,21 @@ final class LibsecretService implements LinuxSecretService {
      * The alias libsecret documents as {@code SECRET_COLLECTION_DEFAULT}: whichever collection the
      * user's desktop has marked as its default keyring.
      */
-    private static final String DEFAULT_COLLECTION = "default";
+    static final String DEFAULT_COLLECTION = "default";
+
+    /**
+     * The two shapes libsecret can turn into a D-Bus object path. An alias becomes one element
+     * under the aliases prefix, and a path is sent as it stands. Either way every element allows
+     * only letters, digits and underscores.
+     *
+     * <p>libsecret picks between those by whether the name holds a slash anywhere, not by whether
+     * it starts with one. This requires a leading slash for the second shape, which is deliberately
+     * the narrower test. It is what refuses {@code foo/bar}, a name libsecret would pass through as
+     * the invalid path it already is. Widening this to match libsecret's own check reinstates the
+     * hang.
+     */
+    private static final Pattern COLLECTION =
+            Pattern.compile("[A-Za-z0-9_]+|(?:/[A-Za-z0-9_]+)+");
 
     private static final int SECRET_SEARCH_NONE = 0;
 
@@ -179,7 +195,7 @@ final class LibsecretService implements LinuxSecretService {
      *         every entry carries is built from
      * @return {@link LinuxSecretService} the bound service
      * @throws IllegalArgumentException when this machine is missing any of the three libraries, or
-     *         one of them exports none of the functions named here
+     *         one of them does not export a function named here
      * @throws UnsatisfiedLinkError when a library is present but cannot be loaded
      */
     static LinuxSecretService open(final String namespace) {
@@ -191,27 +207,45 @@ final class LibsecretService implements LinuxSecretService {
      * provoke a refusal on demand, which no other operation here offers. Reads, searches and
      * removals name no collection and search all of them, so a working service refuses none.
      *
-     * <p>Whatever name a caller passes may use only letters, digits and underscores. It becomes
-     * part of a D-Bus object path, and those are the only characters a path element allows.
-     * An alias is turned into a path under the aliases prefix before anything is sent, so a hyphen
-     * in the name yields a syntactically invalid path. The library asserts on that and abandons the
-     * call without completing it, and the synchronous wrapper then waits for an answer that never
-     * arrives. A hyphen here hangs the calling thread rather than failing it.
+     * <p>A collection is refused here unless every element of it is letters, digits and
+     * underscores. Anything else yields a syntactically invalid D-Bus object path. The library
+     * asserts on that and abandons the call without completing it, and the synchronous wrapper then
+     * waits for an answer that never arrives. Refusing is what keeps a bad name from hanging the
+     * calling thread instead of failing it.
+     *
+     * <p>The refusal runs before any library is loaded, so it answers the same on every platform.
      *
      * @param namespace {@link String} the consumer's reverse-domain namespace, which the schema
      *         every entry carries is built from
      * @param collection {@link String} the collection every store names, as an alias or as an
      *         object path
      * @return {@link LinuxSecretService} the bound service
-     * @throws IllegalArgumentException when this machine is missing any of the three libraries, or
-     *         one of them exports none of the functions named here
+     * @throws IllegalArgumentException when the collection is neither an alias nor an object path,
+     *         when this machine is missing any of the three libraries, or when one of them does not
+     *         export a function named here
      * @throws UnsatisfiedLinkError when a library is present but cannot be loaded
      */
     static LinuxSecretService open(final String namespace, final String collection) {
+        if (!namesACollection(collection)) {
+            throw new IllegalArgumentException("the collection '" + collection + "' must be an"
+                    + " alias, or an object path whose every element is letters, digits and"
+                    + " underscores");
+        }
         return new LibsecretService(schemaNameFor(namespace), collection,
                 SymbolLookup.libraryLookup("libsecret-1.so.0", Arena.global()),
                 SymbolLookup.libraryLookup("libglib-2.0.so.0", Arena.global()),
                 SymbolLookup.libraryLookup("libgobject-2.0.so.0", Arena.global()));
+    }
+
+    /**
+     * Whether libsecret could turn this name into a D-Bus object path. Package-private so a test
+     * can pin both answers on every runner, rather than only where a Secret Service answers.
+     *
+     * @param collection {@link String} the name a caller offered
+     * @return boolean true when it is an alias or an object path this can safely send
+     */
+    static boolean namesACollection(final String collection) {
+        return COLLECTION.matcher(collection).matches();
     }
 
     /**
@@ -481,10 +515,10 @@ final class LibsecretService implements LinuxSecretService {
      * Wraps whatever a native invocation threw.
      *
      * <p>A downcall handle declares {@code Throwable} because a native function may raise anything.
-     * These raise nothing. Their whole failure vocabulary is a return value plus a recorded error.
-     * So reaching here means this binding is wrong, rather than a credential that could not be
-     * stored. The message says the same thing, since a user who sees it is looking at a defect and
-     * not at something their machine did.
+     * These raise nothing. What can fail reports a return value plus a recorded error, and the
+     * release calls report nothing at all. So reaching here means this binding is wrong, rather
+     * than a credential that could not be stored. The message says the same thing, since a user
+     * who sees it is looking at a defect and not at something their machine did.
      *
      * @param cause {@link Throwable} what the invocation threw
      * @return {@link SecretStoreException} the failure to report

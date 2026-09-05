@@ -20,9 +20,9 @@ import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
  * Talks to the Windows Credential Manager through {@code advapi32}, bound with the JDK's own
  * foreign-function API.
  *
- * <p>No third-party library sits in between. The third-party options are unmaintained, and a
- * credential store is the last component to hold a dependency that stops following the JDK. The
- * functions bound here are four, and their shapes have been stable for the whole life of the API.
+ * <p>No third-party library sits in between. A credential store is the last component to hold a
+ * dependency that stops following the JDK. The functions bound here have had stable shapes for the
+ * whole life of the API.
  *
  * <p>Entries are stored as generic credentials, which is the kind Windows keeps for an application
  * rather than for a domain logon. They are scoped to the account that stored them and to this one
@@ -75,7 +75,7 @@ final class Advapi32CredentialManager implements WindowsCredentialManager {
     private final MethodHandle credFree;
 
     /**
-     * Binds the four functions, failing where any of them cannot be found.
+     * Binds the functions this class calls, failing where any of them cannot be found.
      *
      * <p>Private because a caller has no way to handle a machine without {@code advapi32}, and
      * {@link #open()} is where that possibility is turned into an answer.
@@ -114,7 +114,7 @@ final class Advapi32CredentialManager implements WindowsCredentialManager {
      *
      * @return {@link WindowsCredentialManager} the bound credential store
      * @throws IllegalArgumentException when this machine has no {@code advapi32} to load, or it
-     *         exports none of the functions named here
+     *         does not export a function named here
      * @throws UnsatisfiedLinkError when the library is present but cannot be loaded
      */
     static WindowsCredentialManager open() {
@@ -364,10 +364,10 @@ final class Advapi32CredentialManager implements WindowsCredentialManager {
      * Wraps whatever a native invocation threw.
      *
      * <p>A downcall handle declares {@code Throwable} because a native function may raise anything.
-     * These four raise nothing. Their whole failure vocabulary is a false return plus an error code.
-     * So reaching here means this binding is wrong, rather than a credential that could not be
-     * stored. The message says the same thing, since a user who sees it is looking at a defect and
-     * not at something their machine did.
+     * These raise nothing. What can fail reports a false return plus an error code, and the
+     * release call reports nothing at all. So reaching here means this binding is wrong, rather
+     * than a credential that could not be stored. The message says the same thing, since a user
+     * who sees it is looking at a defect and not at something their machine did.
      *
      * @param cause {@link Throwable} what the invocation threw
      * @return {@link SecretStoreException} the failure to report

@@ -14,14 +14,11 @@ import java.util.function.Supplier;
 /**
  * Picks the credential store this machine's operating system offers, where it offers one.
  *
- * <p>The one place a platform's credential store is registered. A machine whose platform has no
- * binding here, or has one that will not load, gets no keyring tier at all. The store above then
- * falls through to whatever writable tier its consumer named. That is a working install rather
- * than a degraded one.
- *
- * <p>All three desktop platforms have a binding. What still answers with nothing is a platform none
- * is written for, a BSD or a Solaris, and a machine whose own platform's library will not load.
- * Both fall to the protected file, where the consumer asked for one.
+ * <p>The one place a platform's credential store is registered. All three desktop platforms have a
+ * binding. A machine gets no keyring tier where none is written for its platform, a BSD or a
+ * Solaris, or where its own platform's library will not load. The store above then falls through
+ * to whatever writable tier its consumer named. That is a working install rather than a degraded
+ * one.
  */
 final class PlatformKeyring {
 
@@ -82,8 +79,7 @@ final class PlatformKeyring {
     /**
      * Whether the given operating system name is a Linux one.
      *
-     * <p>The JVM reports plain {@code Linux} there, with no release riding along. The substring
-     * check is uniformity with the other two rather than a need here.
+     * <p>The JVM reports plain {@code Linux} there, with no release riding along.
      *
      * @param osName {@link String} the raw OS name (e.g. system property os.name)
      * @return boolean true when the name is a Linux one

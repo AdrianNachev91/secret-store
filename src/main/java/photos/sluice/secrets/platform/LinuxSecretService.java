@@ -9,7 +9,7 @@ import java.util.Optional;
  * terms rather than in the service's.
  *
  * <p>It exists so the tier above it can be tested on every platform. The implementation binds native
- * functions and therefore runs on one runner out of three. Everything that decides what to store,
+ * functions and therefore runs only on its own platform. Everything that decides what to store,
  * how to name it and what an answer means stays on this side of the seam.
  *
  * <p>An entry name is opaque here. The tier derives one and this interface only carries it through.

@@ -22,10 +22,9 @@ import java.util.regex.Pattern;
  * for refusing them everywhere. {@code com1} is a symbolic link to a serial device, not a name the
  * path parser reserves outright. A machine with no such device therefore does not have it.
  *
- * <p>Measured: {@code com1} is refused on a Windows 10 desktop (10.0.19045). It creates as an
- * ordinary file on a GitHub Windows Server 2025 runner (10.0.26100). One config, two machines, two
- * answers. A name whose meaning turns on installed hardware must not decide where a credential is
- * kept.
+ * <p>Two Windows versions disagreed about {@code com1}. A Windows 10 desktop refused it, and a
+ * Windows Server 2025 runner created it as an ordinary file. A name whose meaning turns on
+ * installed hardware must not decide where a credential is kept.
  */
 final class ReservedDeviceNames {
 

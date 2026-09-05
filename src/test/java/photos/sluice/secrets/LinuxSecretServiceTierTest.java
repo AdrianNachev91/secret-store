@@ -279,8 +279,8 @@ class LinuxSecretServiceTierTest {
             assertThat(service.entries).containsEntry("anthropic", "sk-synthetic-0002");
         }
 
-        // Refuses one entry rather than everything, because the store only routes a save here
-        // once availability has answered. A wholly broken service never reaches this method.
+        // A working service refusing one entry, which is a different failure from a service that
+        // refuses everything.
         @Test
         void failsLoudWhenAWorkingServiceRefusesTheWrite() {
             final var service = new FakeSecretService();
@@ -452,6 +452,7 @@ class LinuxSecretServiceTierTest {
         // An entry the service admits to holding and will not hand over. That is what a locked
         // collection looks like once libsecret has given up on unlocking it. The search still
         // matches it, while the read produces no value and no error.
+        @SuppressWarnings("SameParameterValue")
         private void storeUnopenable(final String name) {
             this.entries.put(name, "sk-synthetic-unreachable");
             this.unopenable.add(name);
@@ -463,6 +464,7 @@ class LinuxSecretServiceTierTest {
 
         // A service that works but fails one entry, which is what a broken install looks like. It
         // is the case the availability probe has to tell apart from a service answering nothing.
+        @SuppressWarnings("SameParameterValue")
         private void refuseOnly(final String name) {
             this.refusedNames.add(name);
         }

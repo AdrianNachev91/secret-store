@@ -34,9 +34,9 @@ class Advapi32CredentialManagerTest {
     private static final String USER_NAME = "testbed-fixture";
     private static final String OVERSIZED_TARGET = TARGET_PREFIX + "x".repeat(40000);
 
-    // Binding here rather than through the selector is deliberate. The selector turns a refusal into
-    // an absent tier, which would quietly reduce this whole class to a no-op if the binding were
-    // ever built wrong. Calling the binding directly means that fails the build instead.
+    // Binding here rather than through PlatformKeyring is deliberate. That route turns a refusal
+    // into an absent tier, which would quietly reduce this whole class to a no-op if the binding
+    // were ever built wrong. Calling the binding directly means that fails the build instead.
     private final WindowsCredentialManager credentials = Advapi32CredentialManager.open();
 
     @AfterEach

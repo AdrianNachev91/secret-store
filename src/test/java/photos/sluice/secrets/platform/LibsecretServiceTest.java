@@ -43,7 +43,7 @@ class LibsecretServiceTest {
     private static final String NEVER_STORED = NAME_PREFIX + "never-stored";
     private static final String LABEL = "secret-store test fixture";
 
-    // Binding here rather than through the selector is deliberate. The selector turns a refusal
+    // Binding here rather than through PlatformKeyring is deliberate. That route turns a refusal
     // into an absent tier, which would quietly reduce this whole class to a no-op if the binding
     // were ever built wrong. Calling the binding directly means that fails the build instead.
     private final LinuxSecretService secrets = LibsecretService.open("test.secretstore");
@@ -121,8 +121,7 @@ class LibsecretServiceTest {
     // The underscores in this name are load-bearing, and the object-path shape is not. A name
     // reaches the service inside a D-Bus object path, whose elements may hold only letters, digits
     // and underscores. A hyphen makes that path invalid, the library asserts, and the call never
-    // returns at all. That wedged a CI runner until the run was cancelled by hand, which is why
-    // this class carries a timeout.
+    // returns at all. This class carries a timeout for that reason.
     //
     // A path is used rather than an alias only because this one has to name a collection that
     // cannot exist. An alias made of legal characters would work equally well as a provocation.

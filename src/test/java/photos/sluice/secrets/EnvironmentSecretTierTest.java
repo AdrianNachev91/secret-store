@@ -7,8 +7,6 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// The environment arrives as an injected lookup rather than through a static call. That is what
-// makes the override testable at all, so every case here supplies its own lookup.
 class EnvironmentSecretTierTest {
 
     private static final SecretId ANTHROPIC = new SecretId("anthropic", "ANTHROPIC_API_KEY");
@@ -44,8 +42,6 @@ class EnvironmentSecretTierTest {
         assertThat(asked).containsExactly("OTHER_API_KEY");
     }
 
-    // Someone clearing a variable in a shell without unsetting it means to turn the override off,
-    // not to hand the caller an empty credential.
     @Test
     void treatsAnEmptyVariableAsUnset() {
         final var tier = tierOver(Map.of("ANTHROPIC_API_KEY", ""));
@@ -62,8 +58,6 @@ class EnvironmentSecretTierTest {
         assertThat(tier.read(ANTHROPIC)).isEmpty();
     }
 
-    // A value pasted into a shell profile carries whatever whitespace came with it, and that would
-    // otherwise reach the issuing service as part of the credential.
     @Test
     void stripsWhitespaceAroundTheCredential() {
         final var tier = tierOver(Map.of("ANTHROPIC_API_KEY", "  sk-synthetic-0001\n"));

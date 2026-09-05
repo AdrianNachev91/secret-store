@@ -16,8 +16,9 @@ class PlatformKeyringTest {
     private static final String APPLICATION = "SecretStoreFixture";
     private static final String NAMESPACE = "test.secretstore";
 
-    // The real strings the JVM reports, across the releases this ships to. The check is a substring
-    // rather than a list, so what needs proving is that every one of these lands on the same side.
+    // The strings the JVM reports across the releases this ships to, plus a lower-cased one for the
+    // case fold. The check is a substring rather than a list, so what needs proving is that every
+    // one of these lands on the same side.
     @ParameterizedTest
     @ValueSource(strings = {"Windows 10", "Windows 11", "Windows Server 2022", "windows 10",
             "Windows Server 2025"})
@@ -121,7 +122,7 @@ class PlatformKeyringTest {
 
     // The same fact for the macOS binding, and the one that would have caught a platform-specific
     // value resolved while the class loads. Such a failure is an Error rather than an exception,
-    // so it would escape the selector's own handling and kill the store instead of degrading it.
+    // so it would escape this class's own handling and kill the store instead of degrading it.
     @Test
     @DisabledOnOs(OS.MAC)
     void answersWithNothingWhenSecurityFrameworkIsNotOnThisMachine() {

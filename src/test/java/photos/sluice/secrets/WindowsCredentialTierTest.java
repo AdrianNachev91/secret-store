@@ -241,10 +241,8 @@ class WindowsCredentialTierTest {
         }
 
         // A save that silently did nothing is the worst outcome available here, because the user
-        // walks away believing their key is stored.
-        // A working store refusing one entry, rather than a store refusing everything. The store
-        // above only routes a save here once availability has answered, so a comprehensively broken
-        // store is a state this method never sees in production.
+        // walks away believing their key is stored. This is a working store refusing one entry,
+        // which is a different failure from a store that refuses everything.
         @Test
         void failsLoudWhenAWorkingStoreRefusesTheWrite() {
             final var credentials = new FakeCredentialManager();
@@ -361,6 +359,7 @@ class WindowsCredentialTierTest {
 
         // A store that works but fails one entry, which is what a broken install looks like. It is
         // the case the availability probe has to tell apart from a store that answers nothing.
+        @SuppressWarnings("SameParameterValue")
         private void refuseOnly(final String target) {
             this.refusedNames.add(target);
         }
