@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Nothing here reads or writes the repository through the token, and the job holds four publishing
+# secrets.
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          # The username, password and passphrase below are names of environment variables rather
+          # than values. setup-java writes them into a settings.xml that the build dereferences.
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      # A tag is typed by hand and a published version is permanent. Nothing further down catches
+      # the two disagreeing, since both are valid on their own. The help plugin carries a version
+      # so that a later release of it cannot change what this reads.
+      - name: The tag names the version being published
+        run: |
+          pom="$(mvn -B -q org.apache.maven.plugins:maven-help-plugin:3.5.1:evaluate -Dexpression=project.version -DforceStdout)"
+          tag="${GITHUB_REF_NAME#v}"
+          test "$pom" = "$tag" || { echo "tag ${GITHUB_REF_NAME}, POM ${pom}"; exit 1; }
+
+      # The suite reaches a real Secret Service on Linux and refuses to skip when none answers. The
+      # secret-tool round trip is the daemon's own smoke test. A keyring that failed to start says
+      # so here, rather than as a puzzling Java failure further on.
+      - name: Start a Secret Service
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnome-keyring libsecret-1-0 libsecret-tools dbus-x11
+          eval "$(dbus-launch --sh-syntax)"
+          eval "$(printf 'secret-store-ci\n' | gnome-keyring-daemon --unlock --replace --components=secrets)"
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> "$GITHUB_ENV"
+          printf 'smoke' | secret-tool store --label='secret-store release smoke test' secret-store-ci-smoke check
+          test "$(secret-tool lookup secret-store-ci-smoke check)" = 'smoke'
+          secret-tool clear secret-store-ci-smoke check
+
+      - name: Test, sign and upload
+        run: mvn -B -P release deploy
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      # A green run means uploaded and validated, not published. Without this the only thing saying
+      # a person still has to press Publish is memory.
+      - name: Say what is still outstanding
+        run: |
+          echo 'Uploaded and validated. It is not on Central until someone presses Publish in the Portal.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'https://central.sonatype.com/publishing/deployments' >> "$GITHUB_STEP_SUMMARY"

@@ -156,13 +156,14 @@ machine is the one that never had a keyring, and this is the trade that keeps it
 
 ## Releases
 
-A release will be published from CI on a `v*` tag, signed with a GPG key from the repository
-secrets, through the Central publishing plugin. That workflow and the POM configuration Central
-requires are not written yet, so nothing publishes today. Central is immutable, so a version number
-is a promise. `1.0.0` says the surface is closed rather than settling, which the sealed
-`SecretStatus` and the package-private tier interfaces already enforce. Its evidence is one
-consumer's suite migrated onto the library and run, and one credential read back across the two
-under the same native key, on Windows alone.
+A release is published from CI on a `v*` tag, signed with a GPG key from the repository secrets,
+through the Central publishing plugin. The workflow refuses a tag whose name disagrees with the
+POM's version, runs the suite, then signs and uploads in one invocation. The upload validates and
+then waits. Putting a version on Central stays a person's button in the Portal rather than a tag's
+side effect. Central is immutable, so a version number is a promise. `1.0.0` says the surface is
+closed rather than settling, which the sealed `SecretStatus` and the package-private tier
+interfaces already enforce. Its evidence is one consumer's suite migrated onto the library and
+run, and one credential read back across the two under the same native key, on Windows alone.
 
 `example/` is a separate Maven project rather than a module of this build. Its POM names the
 library version in one property, which the release sets to the version it just published. Building

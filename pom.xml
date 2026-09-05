@@ -24,6 +24,19 @@
     </license>
   </licenses>
 
+  <developers>
+    <developer>
+      <name>Adrian Nachev</name>
+      <url>https://github.com/AdrianNachev91</url>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/AdrianNachev91/secret-store.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/AdrianNachev91/secret-store.git</developerConnection>
+    <url>https://github.com/AdrianNachev91/secret-store</url>
+  </scm>
+
   <properties>
     <!-- The current LTS. Raising it breaks every consumer below, so it moves only on a major
          version. -->
@@ -88,4 +101,69 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- What Central requires on top of the jar. In a profile so an ordinary build neither signs
+         nor reaches a repository. -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.4.0</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.12.0</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.11.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <!-- The upload validates and then waits in the Portal. Central is immutable, so
+                   releasing stays a person's button rather than a tag's side effect. -->
+              <autoPublish>false</autoPublish>
+              <waitUntil>validated</waitUntil>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
