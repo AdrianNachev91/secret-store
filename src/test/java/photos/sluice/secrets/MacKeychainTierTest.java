@@ -77,8 +77,7 @@ class MacKeychainTierTest {
             assertThat(tier(keychain).read(ANTHROPIC)).isEmpty();
         }
 
-        // Copying the Linux tier's second existence check across would leave every other case in
-        // this class green.
+        // An existence check after a failed read would leave every other case in this class green.
         @Test
         void neverAsksWhetherTheEntryExistsAfterAReadFindsNothing() {
             final var keychain = new FakeKeychain();
@@ -301,7 +300,8 @@ class MacKeychainTierTest {
             assertThat(keychain.storedText("anthropic")).isEqualTo("sk-synthetic-0002");
         }
 
-        // One entry rather than everything, so this stays distinct from the case below it.
+        // A working keychain refusing one entry, which is a different failure from a keychain that
+        // refuses everything.
         @Test
         void failsLoudWhenAWorkingKeychainRefusesTheWrite() {
             final var keychain = new FakeKeychain();
@@ -311,7 +311,8 @@ class MacKeychainTierTest {
                     .isInstanceOf(SecretStoreException.class);
         }
 
-        // Nothing else pins the write's asymmetry with read and erase, which do absorb this.
+        // The write is the one operation that does not absorb a refusal. Read and erase absorb one
+        // from a keychain this unreachable, and rethrow it from a keychain that still answers.
         @Test
         void failsLoudEvenWhenTheWholeKeychainIsUnusableHere() {
             final var keychain = new FakeKeychain();
@@ -463,6 +464,7 @@ class MacKeychainTierTest {
             this.entries.put(name, secret.getBytes(StandardCharsets.UTF_8));
         }
 
+        @SuppressWarnings("SameParameterValue")
         private String storedText(final String name) {
             return new String(this.entries.get(name), StandardCharsets.UTF_8);
         }
@@ -472,6 +474,7 @@ class MacKeychainTierTest {
         }
 
         // The case the availability probe has to tell apart from a keychain answering nothing.
+        @SuppressWarnings("SameParameterValue")
         private void refuseOnly(final String name) {
             this.refusedNames.add(name);
         }

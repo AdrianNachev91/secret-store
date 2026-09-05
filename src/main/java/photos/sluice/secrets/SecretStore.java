@@ -7,10 +7,10 @@ import java.util.Optional;
 /**
  * Where a credential lives, across the tiers a machine offers.
  *
- * <p>Two methods rather than one, because the two callers want opposite things. Whatever
- * authenticates with the credential needs the value and not the tier. Whatever reports where it
- * lives needs the tier and must never hold the value. So {@link #status} cannot return a
- * credential at all.
+ * <p>Reading the credential and reporting where it lives are separate methods, because the two
+ * callers want opposite things. Whatever authenticates with the credential needs the value and not
+ * the tier. Whatever reports where it lives needs the tier and must never hold the value. So no
+ * reporting method here can return a credential at all.
  *
  * <p>A read stops at the first tier that answers, with an environment variable ahead of anything
  * stored.
@@ -22,12 +22,10 @@ public interface SecretStore {
 
     // A credential is a token the issuing service mints, not prose. The longest any of them mints
     // runs to a few hundred characters, and the tightest store reached here is the Windows
-    // credential blob at 2,560 bytes. So the ceiling sits below every store's own capacity, which
-    // is what keeps a refusal this library's sentence rather than the platform's. It counts
-    // characters against a byte cap, so a credential near the ceiling and largely outside ASCII
-    // can still be refused by Windows instead. Held here rather than on a value type because a
-    // credential never becomes one. It goes from a caller's input to a tier, and nothing in
-    // between models it.
+    // credential blob at 2,560 bytes. So for an ASCII credential the ceiling sits below every
+    // store's own capacity, which is what keeps a refusal this library's sentence rather than the
+    // platform's. It counts characters against a byte cap, so a credential near the ceiling and
+    // largely outside ASCII can still be refused by Windows instead.
     /**
      * The character ceiling a credential is measured against, once stripped.
      */
@@ -203,9 +201,10 @@ public interface SecretStore {
      *
      * <p>That clearing is best effort, and its limit is worth knowing. A tier only outranks the one
      * written to when it could not be written to itself, which on this machine means it could not be
-     * reached. A store that cannot be reached cannot be cleared either, and reports nothing. So the
-     * case where a stale value survives a save is exactly the case this cannot fix, and the save
-     * reports success. What settles which value is really in force is {@link #status}.
+     * reached. A store that cannot be reached cannot be cleared either, and reports nothing. So in
+     * almost every case where a stale value survives a save, this cannot fix it and the save
+     * reports success. The exception is the narrow one {@link StaleSecretNotClearedException}
+     * reports. What settles which value is really in force is {@link #status}.
      *
      * @param id {@link SecretId} which credential to store
      * @param secret {@link String} the credential to store

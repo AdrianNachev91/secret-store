@@ -60,7 +60,7 @@ final class SecurityFrameworkKeychain implements MacKeychain {
     private static final int SUCCESS = 0;
 
     // Package-private, not private, so a second independent transcription in the test can catch a
-    // transposed digit here. Unlike the four codes explain() words, these two are read by the
+    // transposed digit here. Unlike the codes explain() words, these two are read by the
     // control flow itself rather than by a message. A wrong value misroutes a call instead of
     // misdescribing one.
     static final int ITEM_NOT_FOUND = -25300;
@@ -72,7 +72,9 @@ final class SecurityFrameworkKeychain implements MacKeychain {
     private static final int INTERACTION_NOT_ALLOWED = -25308;
 
     /**
-     * The most passes a store takes.
+     * The most passes a store takes. One pass is add-then-update. A second survives a single
+     * interleaved removal, and a competitor winning twice running is reported rather than retried
+     * forever.
      */
     private static final int STORE_ATTEMPTS = 2;
 
@@ -198,7 +200,7 @@ final class SecurityFrameworkKeychain implements MacKeychain {
      *         consumer's credentials under one heading in Keychain Access
      * @return {@link MacKeychain} the bound keychain
      * @throws IllegalArgumentException when this machine is missing either framework, or one of them
-     *         exports none of the names read here
+     *         does not export a name read here
      * @throws UnsatisfiedLinkError when a framework is present but cannot be loaded
      */
     static MacKeychain open(final String service) {
@@ -221,7 +223,7 @@ final class SecurityFrameworkKeychain implements MacKeychain {
      *         one
      * @return {@link MacKeychain} the bound keychain
      * @throws IllegalArgumentException when this machine is missing either framework, or one of them
-     *         exports none of the names read here
+     *         does not export a name read here
      * @throws UnsatisfiedLinkError when a framework is present but cannot be loaded
      */
     static MacKeychain open(final String service, final @Nullable String itemClass) {
@@ -241,7 +243,7 @@ final class SecurityFrameworkKeychain implements MacKeychain {
      * @param competitor {@link CompetingWriter} what acts on the entry inside a store
      * @return {@link MacKeychain} the bound keychain
      * @throws IllegalArgumentException when this machine is missing either framework, or one of them
-     *         exports none of the names read here
+     *         does not export a name read here
      * @throws UnsatisfiedLinkError when a framework is present but cannot be loaded
      */
     static MacKeychain open(final String service, final @Nullable String itemClass,
@@ -287,10 +289,10 @@ final class SecurityFrameworkKeychain implements MacKeychain {
     @Override
     public boolean holds(final String name) {
         try (final Arena arena = Arena.ofConfined(); final CfScope scope = new CfScope()) {
-            // Attributes are asked for and the value is not, which is what buys the no-prompt
-            // guarantee. Apple documents attributes as unencrypted; that the data is the part
-            // needing a password is what follows from it. So this call can be made while a settings
-            // label is drawn, without putting a keychain dialog on screen.
+            // Attributes are asked for and the value is not, which is what keeps the prompt off.
+            // Apple documents attributes as unencrypted; that the data is the part needing a
+            // password is what follows from it. So this call can be made while a settings label is
+            // drawn, without the keychain asking for one.
             final MemorySegment query = this.dictionary(arena, scope,
                     new MemorySegment[] {this.attributeClass, this.attributeService,
                             this.attributeAccount, this.returnAttributes, this.matchLimit},
@@ -369,7 +371,7 @@ final class SecurityFrameworkKeychain implements MacKeychain {
      * standing for a family gets worded as the family. A message naming one cause sends everyone
      * who arrived by another to a repair that changes nothing for them.
      *
-     * <p>Package-private so the wording and the four integers can be tested. Those integers are
+     * <p>Package-private so the wording and the integers can be tested. Those integers are
      * transcribed by hand from Apple's headers, and only one runner ever executes this class. A
      * transposed digit would otherwise reach a user as a bare number where a sentence belonged.
      *
@@ -385,8 +387,8 @@ final class SecurityFrameworkKeychain implements MacKeychain {
             case INTERACTION_NOT_ALLOWED -> "the keychain needs to ask you something and nothing"
                     + " here can put that request on screen (error " + status + ")";
             case USER_CANCELED -> "the keychain request was dismissed (error " + status + ")";
-            // The workaround is offered rather than asserted. It comes from Apple's own engineer
-            // for one macOS 26 regression, and this code also covers an ordinary wrong password.
+            // The workaround is offered rather than asserted. This code also covers an ordinary
+            // wrong password.
             case AUTH_FAILED -> "macOS would not authenticate against your keychain. If it keeps"
                     + " happening, locking and unlocking that keychain in Keychain Access has been"
                     + " reported to clear it (error " + status + ")";
@@ -463,7 +465,7 @@ final class SecurityFrameworkKeychain implements MacKeychain {
      * <p>Returns quietly on success. Each caller separately decides what the codes meaning absence
      * or a clash mean for its own operation, before reaching here.
      *
-     * <p>The four codes worded here are the ones a user can act on, and each of them is reachable on
+     * <p>The codes worded here are the ones a user can act on, and each of them is reachable on
      * an ordinary machine. Everything else arrives as its number, which is enough to look up and
      * more honest than a guess at what it meant.
      *
@@ -763,10 +765,9 @@ final class SecurityFrameworkKeychain implements MacKeychain {
     /**
      * A loaded framework, paired with the name to blame when it is missing something.
      *
-     * <p>The pairing is the point. Two frameworks are read here, and the selector logs whichever
-     * message comes back as its diagnosis of the machine. A lookup that names the wrong one sends
-     * its only reader after the wrong library. Carrying the name beside the lookup means a call
-     * site cannot get that pairing wrong, where passing the name per call would let it.
+     * <p>The pairing is the point. Two frameworks are read here, and a framework named wrong in a
+     * failure sends a reader after the wrong library. Carrying the name beside the lookup means a
+     * call site cannot get that pairing wrong, where passing the name per call would let it.
      *
      * @param name {@link String} what to call this framework in a failure
      * @param lookup {@link SymbolLookup} the loaded framework

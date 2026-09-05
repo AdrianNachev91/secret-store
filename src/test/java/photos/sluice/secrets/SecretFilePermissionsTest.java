@@ -40,10 +40,6 @@ class SecretFilePermissionsTest {
         });
     }
 
-    // A Windows token can name a group as the default owner of everything it creates. That is
-    // ordinary on an administrator account, and it is what the CI runner does. Granting the group would
-    // restrict the file to everyone in it, and refusing would leave that machine unable to store a
-    // credential at all. The account running the process is the one that needs the access.
     @Test
     void namesTheProcessAccountWhenTheFileIsOwnedByAGroup() throws IOException {
         final var view = new RecordingAclView(new NamedGroup("BUILTIN\\Administrators"));
@@ -77,8 +73,6 @@ class SecretFilePermissionsTest {
         assertThat(view.applied).isNull();
     }
 
-    // A volume can accept an access-rule change and drop it. Reporting the credential as protected
-    // then tells the user something untrue about it, which is what the refusal exists to prevent.
     @Test
     void refusesWhenTheRuleDidNotSurviveBeingApplied() throws IOException {
         final var view = new DiscardingAclView(new NamedPrincipal("TESTBED\\owner"));
@@ -87,8 +81,9 @@ class SecretFilePermissionsTest {
     }
 
     // A rule granting a group full control would leave every member of it able to read the
-    // credential, while this library reported the file as protected. The group is never the grantee, no
-    // matter which side of the decision it arrives on.
+    // credential, while this library reported the file as protected. Both owner kinds are
+    // exercised. A group owner falls back to the group process account and is refused. An account
+    // owner is granted without the fallback being consulted at all.
     @Test
     void neverGrantsAGroupFullControl() throws IOException {
         final var ownedByGroup = new RecordingAclView(new NamedGroup("BUILTIN\\Administrators"));

@@ -47,8 +47,9 @@ final class LinuxSecretServiceTier implements WritableSecretTier {
      *
      * <p>Two separate things keep this name from matching something real, and they cover different
      * populations. Another application's secrets are excluded by the schema, which every call
-     * carries and which the service matches on. A credential stored by anything else answers to a
-     * different schema and is invisible to every lookup, search and removal made here.
+     * carries and which the service matches on. A credential stored under a different schema is
+     * invisible to every lookup, search and removal made here, and two consumers choosing one
+     * namespace share a schema.
      *
      * <p>The consumer's own credentials are excluded by the capitalisation. A credential's name is
      * lower case by the rule that validates one, so none can ever name this entry. That puts the

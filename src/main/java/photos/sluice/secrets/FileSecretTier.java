@@ -57,8 +57,7 @@ class FileSecretTier implements WritableSecretTier {
         final Path file = this.fileFor(id);
         final String stored;
         // The read itself answers whether the credential is there. An existence check ahead of it
-        // cannot signal a failure, so it reports a present but unreadable file as absent. The user
-        // is then told to add a key that is already stored.
+        // cannot signal a failure, so it would report a present but unreadable file as absent.
         try {
             stored = this.readFile(file);
         } catch (final NoSuchFileException _) {
@@ -68,9 +67,8 @@ class FileSecretTier implements WritableSecretTier {
                     "Reading the credential '" + id.name()
                             + "' from " + file + " failed", e);
         }
-        // Stripped on the way out. Nothing stops a user creating this file by hand, and the ordinary
-        // ways of doing that append a newline. That newline would reach the issuing service as part
-        // of the credential.
+        // Nothing stops a user creating this file by hand, and the ordinary ways of doing that
+        // append a newline. That newline would reach the issuing service as part of the credential.
         final String credential = stored.strip();
         if (credential.isEmpty()) {
             return Optional.empty();

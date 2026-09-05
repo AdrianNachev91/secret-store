@@ -5,8 +5,8 @@ on:
     tags:
       - 'v*'
 
-# Nothing here reads or writes the repository through the token, and the job holds four publishing
-# secrets.
+# The ancestry check below reads the repository through the token, and nothing here writes it. The
+# job holds four publishing secrets, so the token gets no more than that read.
 permissions:
   contents: read
 
@@ -15,7 +15,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # The ancestry check below reads main's history down to the tagged commit. A default checkout
+      # of a tag fetches neither main nor that history.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # A tag names any commit its author chooses, and Central is immutable. Publishing from a
+      # commit main never carried would ship code main's own history does not contain.
+      #
+      # Coverage is the second reason. This leg tests on Ubuntu alone, and main's CI is where the
+      # Windows and macOS runners are.
+      #
+      # Ahead of setup-java, so a tag about to be refused never materialises the signing key.
+      - name: The tag sits on a commit that reached main
+        run: |
+          git fetch --no-tags --quiet origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD \
+            || { echo "${GITHUB_REF_NAME} names ${GITHUB_SHA}, which is not on main"; exit 1; }
 
       - uses: actions/setup-java@v5
         with:

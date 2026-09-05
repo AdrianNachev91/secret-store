@@ -18,7 +18,7 @@ public final class PlatformBindings {
      *
      * @return {@link WindowsCredentialManager} the bound credential store
      * @throws IllegalArgumentException when this machine has no {@code advapi32} to load, or it
-     *         exports none of the functions the binding names
+     *         does not export a function the binding names
      * @throws UnsatisfiedLinkError when the library is present but cannot be loaded
      */
     public static WindowsCredentialManager openWindowsCredentialManager() {
@@ -32,7 +32,7 @@ public final class PlatformBindings {
      *         consumer's credentials under one heading in Keychain Access
      * @return {@link MacKeychain} the bound keychain
      * @throws IllegalArgumentException when this machine is missing either framework, or one of
-     *         them exports none of the names the binding reads
+     *         them does not export a name the binding reads
      * @throws UnsatisfiedLinkError when a framework is present but cannot be loaded
      */
     public static MacKeychain openMacKeychain(final String service) {
@@ -46,7 +46,7 @@ public final class PlatformBindings {
      *         every entry carries is built from
      * @return {@link LinuxSecretService} the bound service
      * @throws IllegalArgumentException when this machine is missing any of the three libraries, or
-     *         one of them exports none of the functions the binding names
+     *         one of them does not export a function the binding names
      * @throws UnsatisfiedLinkError when a library is present but cannot be loaded
      */
     public static LinuxSecretService openLinuxSecretService(final String namespace) {

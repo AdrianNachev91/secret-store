@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 // A real directory rather than a fake filesystem. What this tier is for is the state it leaves on
-// disk, so a fake would answer the questions worth asking here.
+// disk, and a fake would only agree with itself about that.
 class FileSecretTierTest {
 
     private static final SecretId ANTHROPIC = new SecretId("anthropic", "ANTHROPIC_API_KEY");
@@ -191,9 +191,8 @@ class FileSecretTierTest {
             assertThat(tier.read(ANTHROPIC)).contains("sk-synthetic-second");
         }
 
-        // The credential directory sits beside the config file rather than in it, and nothing else
-        // creates it. A fresh install stores its first credential into a directory that is not
-        // there yet.
+        // Nothing but a save creates the credential directory, so a fresh install stores its first
+        // credential into a directory that is not there yet.
         @Test
         void createsTheCredentialDirectoryWhenItIsNotThereYet(@TempDir final Path parent) {
             final Path secrets = parent.resolve("secrets");
@@ -216,9 +215,9 @@ class FileSecretTierTest {
             assertThat(fileNamesIn(secrets)).containsExactly(KEY_FILE);
         }
 
-        // Two installs can share one app-data directory, and one process can run two jobs. A
-        // temporary name derived from the credential name alone would be the same path for all of them,
-        // where each write publishes or destroys another's.
+        // Two installs can share one directory, and one process can run two jobs. A temporary name
+        // derived from the credential name alone would be the same path for all of them, where each
+        // write publishes or destroys another's.
         @Test
         void everyWriteWorksThroughATemporaryFileOfItsOwn(@TempDir final Path secrets) {
             final var tier = new RecordingTemporaryTier(secrets);
@@ -307,8 +306,8 @@ class FileSecretTierTest {
             assertThat(fileNamesIn(secrets)).isEmpty();
         }
 
-        // One of these two runs per CI leg, and between them the matrix covers both permission
-        // models against a real filesystem.
+        // A leg runs whichever of the two permission models its filesystem offers, so the matrix
+        // covers both against a real filesystem.
         @Test
         void storesTheCredentialReadableByItsOwnerAlone(@TempDir final Path secrets) throws IOException {
             assumeTrue(supports(secrets, PosixFileAttributeView.class),
@@ -376,6 +375,7 @@ class FileSecretTierTest {
             assertThatThrownBy(() -> tier.erase(ANTHROPIC))
                     .isInstanceOf(SecretStoreException.class)
                     .hasMessageContaining("anthropic");
+            assertThat(tier.read(ANTHROPIC)).contains("sk-synthetic-0004");
         }
     }
 

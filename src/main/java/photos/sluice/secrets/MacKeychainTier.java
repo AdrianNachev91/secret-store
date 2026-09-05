@@ -16,25 +16,23 @@ import java.util.Optional;
  * derived here rather than carried on the id, because what an entry is called is this platform's
  * business and no other tier's.
  *
- * <p>Whether an entry exists is answered from its attributes, which the keychain keeps unencrypted,
- * so reporting where a credential lives never puts a password dialog on screen. Reading the
- * credential itself may, and that is the right place for the dialog: the caller is about to use
- * the credential.
+ * <p>Whether an entry exists is answered from its attributes. Apple documents the keychain as
+ * keeping those unencrypted, so reporting where a credential lives does not ask for a password.
+ * Reading the credential itself may, and that is the right place for the dialog: the caller is
+ * about to use the credential.
  *
  * <p>That split has a cost. An entry someone hand-filled with only whitespace reports as held here
  * and still answers nothing on a read. This library can never store one, since a save strips the
  * value and refuses a blank. The alternative was reading the value to decide, which is the dialog
  * the split exists to avoid.
  *
- * <p>Where this platform differs from the Linux one is what a locked store looks like. Apple
- * documents a distinct status code for a keychain that needs to ask something and cannot. An entry
- * that exists and will not open should therefore arrive as a refusal rather than as silence.
+ * <p>Apple documents a distinct status code for a keychain that needs to ask something and cannot.
+ * So an entry that exists and will not open should arrive as a refusal rather than as silence.
  * Nothing here asks a second time to tell that apart from an absent entry.
  *
- * <p>That rests on the documentation rather than on observation, and the difference is worth
- * keeping. No test has run against a locked keychain, because a hosted runner's is unlocked. The
- * residue is covered anyway: an item the keychain matches and then hands no bytes for fails loud
- * rather than reporting absence, whatever the reason for it.
+ * <p>That rests on Apple's documentation rather than on observation. The residue is covered either
+ * way: an item the keychain matches and then hands no bytes for fails loud rather than reporting
+ * absence, whatever the reason for it.
  *
  * <p>What a read answers is the stored value stripped of surrounding whitespace, and nothing at all
  * when only whitespace is stored. That matches every other tier, so which one answered cannot change

@@ -9,10 +9,10 @@ import java.util.Optional;
  * Puts the machine's credential tiers in order and applies each operation to the tiers it belongs
  * to.
  *
- * <p>The three operations reach different tiers, and that asymmetry is the whole of this class. A
- * read stops at the first that answers. A save writes to the writable one that ranks highest and
- * says it can be used here, then clears any tier that outranks it. A remove reaches every writable
- * tier.
+ * <p>Each operation reaches a different set of tiers, and that asymmetry is the whole of this
+ * class. A read stops at the first that answers. A save writes to the writable one that ranks
+ * highest and says it can be used here, then clears any tier that outranks it. A remove reaches
+ * every writable tier.
  *
  * <p>A remove clearing only the tier that answered would expose an older credential sitting in a
  * tier below it, which reads as the removal having silently failed. A save leaving a stale value
@@ -154,8 +154,8 @@ class TieredSecretStore implements SecretStore {
     /**
      * The tier a save would write to on this machine right now.
      *
-     * <p>Shared by {@link #save} and {@link #whereASaveWouldStoreIt}. Restated in either one, a
-     * sentence promising a tier could name one the save then misses.
+     * <p>The one place the routing rule lives, so a promise about where a save lands cannot drift
+     * from where it lands.
      *
      * @return an {@link Optional} of {@link WritableSecretTier} the tier a save reaches, empty when
      *         none can be used here
@@ -220,8 +220,8 @@ class TieredSecretStore implements SecretStore {
      *
      * <p>Best effort, and it cannot reach the case that motivates it. A tier outranks the target
      * only by having answered {@code available()} false, or it would have taken the write itself.
-     * Every keyring tier returns quietly from an erase against a store it cannot reach, which is a
-     * trade {@link #remove} documents and this inherits. Take the headline case: a session with no
+     * Every keyring tier returns quietly from an erase against a store it cannot reach, the same
+     * trade each of those tiers makes for a removal. Take the headline case: a session with no
      * D-Bus saves through the file tier, under a keyring still holding an older credential. The
      * clear does nothing, the save reports success, and the keyring answers the older value again
      * once it is reachable.

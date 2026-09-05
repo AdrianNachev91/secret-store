@@ -6,8 +6,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// Both halves are used to locate a stored value. An id missing either would let a lookup read
-// somewhere else without saying so, which is why the refusal sits in the constructor.
 class SecretIdTest {
 
     @Test
@@ -34,8 +32,6 @@ class SecretIdTest {
                 .hasMessageContaining("environment variable");
     }
 
-    // The name becomes part of a path under the credential directory. A separator or a parent
-    // reference in it would put the credential file somewhere else entirely.
     @Test
     void refusesANameThatWouldReachOutOfTheCredentialDirectory() {
         assertThatThrownBy(() -> new SecretId("../../etc/passwd", "ANTHROPIC_API_KEY"))
@@ -46,9 +42,6 @@ class SecretIdTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    // Windows resolves a device name whatever extension follows it, so 'con.key' would name the
-    // console rather than a file. The refusal runs on every platform, or a caller would ship an id
-    // that works where they built it and breaks for a Windows user.
     @Test
     void refusesANameMatchingAWindowsDevice() {
         assertThatThrownBy(() -> new SecretId("con", "CON_API_KEY"))

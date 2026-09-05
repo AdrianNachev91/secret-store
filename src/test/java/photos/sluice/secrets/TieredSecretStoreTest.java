@@ -251,7 +251,7 @@ class TieredSecretStoreTest {
                     // one. The tier field is what it branches on, so the field is the claim.
                     .satisfies(thrown -> assertThat(((SecretStoreException) thrown).tier())
                             .isEqualTo(SecretStoreException.Tier.STORE))
-                    // Both failures arrive as STORE, and the row has to say opposite things for
+                    // Both failures arrive as STORE, and a surface has to say opposite things for
                     // them: enter a key, against the key is saved. Only the type separates them.
                     .isNotInstanceOf(StaleSecretNotClearedException.class)
                     .hasMessageContaining("anthropic");
@@ -287,8 +287,7 @@ class TieredSecretStoreTest {
             assertThat(store.whereASaveWouldStoreIt()).isEmpty();
         }
 
-        // Restated rather than shared, the routing would be two copies of one rule. This is the
-        // assertion that fails when they drift.
+        // The assertion that fails if the promise and the save ever stop agreeing.
         @Test
         void namesTheTierTheSaveThenWritesTo() {
             final var keyring = writableTier(SecretTierKind.KEYRING, 100, false, null);
@@ -577,8 +576,8 @@ class TieredSecretStoreTest {
                     .hasMessageContaining("inNamespace");
         }
 
-        // A null turned into a switched-off tier would report the machine as having nowhere to
-        // store a credential, blaming the machine for the caller's empty argument.
+        // A null directory turned into a switched-off tier would report the machine as having
+        // nowhere to store a credential, blaming the machine for the caller's empty argument.
         //
         // The nulls below are what the inspection is for, so it is suppressed rather than obeyed.
         // JSpecify is compile-time only and absent from a consumer's runtime, so a consumer that
@@ -791,8 +790,8 @@ class TieredSecretStoreTest {
         }
     }
 
-    // The base for the tiers that exist to fail one particular way. Each subclass overrides only
-    // the method its test is about, so the failure under test is the only thing unusual about it.
+    // The base for the tiers that exist to fail one particular way. A subclass overrides only what
+    // its own failure needs, so nothing else about it is unusual.
     private abstract static class BrokenTier implements WritableSecretTier {
 
         @Override
@@ -827,8 +826,8 @@ class TieredSecretStoreTest {
         public void erase(final SecretId id) {}
     }
 
-    // Answers that it holds a credential and refuses to produce one, which is what a locked
-    // credential store looks like to anything that only needs a label.
+    // Answers that it holds a credential, and fails the test outright if anything retrieves one.
+    // The status route has to report a locked store without reading through it.
     private static final class RetrievalRefusingTier extends BrokenTier {
 
         @Override
