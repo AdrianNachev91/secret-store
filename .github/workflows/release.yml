@@ -41,8 +41,8 @@ jobs:
           cache: maven
           # The username, password and passphrase below are names of environment variables rather
           # than values. setup-java writes a settings.xml naming them, and the build reads the
-          # environment through it. The passphrase arrives as a `gpg.passphraseEnvName` property,
-          # which maven-gpg-plugin honours from 3.2.0. This POM pins 3.2.8.
+          # environment through it. The passphrase arrives as a `gpg.passphraseEnvName` property
+          # that maven-gpg-plugin reads.
           server-id: central
           server-username: MAVEN_CENTRAL_USERNAME
           server-password: MAVEN_CENTRAL_PASSWORD
