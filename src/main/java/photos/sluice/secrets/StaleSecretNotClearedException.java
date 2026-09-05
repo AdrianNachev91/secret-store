@@ -1,5 +1,7 @@
 package photos.sluice.secrets;
 
+import java.io.Serial;
+
 /**
  * Thrown when a credential was stored and an older copy above it could not be cleared, so that
  * older copy may still answer a read.
@@ -14,6 +16,9 @@ package photos.sluice.secrets;
  * failure {@code remove} produces, so the call site already discriminates it.
  */
 public final class StaleSecretNotClearedException extends SecretStoreException {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     /**
      * Creates the exception with a message naming the credential whose fresh value may be shadowed.

@@ -1,5 +1,7 @@
 package photos.sluice.secrets;
 
+import java.io.Serial;
+
 /**
  * Thrown when a tier cannot determine what it holds, or refuses to store or clear a credential.
  *
@@ -40,6 +42,14 @@ public class SecretStoreException extends RuntimeException {
         STORE
     }
 
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * {@link Tier} where the failure happened.
+     *
+     * @serial
+     */
     private final Tier tier;
 
     /**
