@@ -40,7 +40,7 @@ Reaching the operating system's store needs a native-access grant, which a consu
 <dependency>
   <groupId>photos.sluice</groupId>
   <artifactId>secret-store</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
 </dependency>
 ```
 
