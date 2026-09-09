@@ -158,8 +158,9 @@ final class PlatformKeyring {
         try {
             return Optional.of(binding.get());
         } catch (final IllegalArgumentException | UnsatisfiedLinkError absent) {
-            log.log(Level.INFO, "Could not bind a credential store on this machine, so credentials"
-                    + " go to the protected file instead. Reason: {0}", absent.getMessage());
+            log.log(Level.INFO, "The secret-store library could not bind a credential store on this"
+                    + " machine, so credentials go to the protected file instead. Reason: {0}",
+                    absent.getMessage());
             return Optional.empty();
         }
     }

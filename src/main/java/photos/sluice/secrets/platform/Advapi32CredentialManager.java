@@ -374,7 +374,7 @@ final class Advapi32CredentialManager implements WindowsCredentialManager {
      */
     private static SecretStoreException binding(final Throwable cause) {
         return new SecretStoreException(SecretStoreException.Tier.KEYRING,
-                "This library's binding to the Windows Credential Manager is built wrong and could not be "
-                        + "called", cause);
+                "The secret-store library's binding to the Windows Credential Manager is built"
+                        + " wrong and could not be called", cause);
     }
 }

@@ -497,7 +497,8 @@ final class SecurityFrameworkKeychain implements MacKeychain {
      */
     private static SecretStoreException binding(final Throwable cause) {
         return new SecretStoreException(SecretStoreException.Tier.KEYRING,
-                "This library's binding to the macOS keychain is built wrong and could not be called",
+                "The secret-store library's binding to the macOS keychain is built wrong and could"
+                        + " not be called",
                 cause);
     }
 
