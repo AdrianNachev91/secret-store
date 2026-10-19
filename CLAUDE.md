@@ -58,7 +58,8 @@ Manager, the macOS keychain and the freedesktop Secret Service. They are bound t
 - A test secret is a synthetic string. No real credential, no personal path and no person's name in
   code, comments or docs. Three places carry the author's name because they are what a publisher
   signs: the repository's own URL, the copyright line in `LICENSE`, and the `developers` block in
-  `pom.xml`, which is what the Central listing shows.
+  `pom.xml`, which is what the Central listing shows. A recorded ruling reads "owner's ruling,
+  <date>", never his name.
 - The transcripts in `example/README.md` are real runs, pasted. Changing what the CLI prints means
   running the Windows sequence again, and taking the runner's `where` from the latest Example
   workflow log.
